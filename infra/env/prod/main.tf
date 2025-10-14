@@ -1,12 +1,23 @@
+# ==============================================================================
+# AMBIENTE PROD - Infraestructura de producción
+# ==============================================================================
+# Despliega toda la infraestructura en ambiente de Producción.
+# Usa workspace "prod" para separar el state de QA.
+# ==============================================================================
+
 terraform {
   required_version = ">= 1.9.0"
-  required_providers { aws = { source = "hashicorp/aws", version = "~> 5.0" } }
-  backend "s3" {}
+  required_providers {
+    aws = { source = "hashicorp/aws", version = "~> 5.0" }
+  }
+  backend "s3" {}  // Configurado vía backend.hcl
 }
 
 provider "aws" {
   region = var.region
-    default_tags {
+  
+  # Tags aplicados automáticamente a TODOS los recursos
+  default_tags {
     tags = {
       Project     = "movie-analyst"
       Environment = local.env
@@ -19,17 +30,19 @@ provider "aws" {
 
 locals {
   app         = "movie-analyst"
-  env         = terraform.workspace  # ← Cambia esto para que use el workspace
+  env         = terraform.workspace  // Usa el nombre del workspace (prod)
   name_prefix = "${local.app}-${local.env}"
   
-  # Tags comunes para recursos específicos
+  # Tags adicionales para recursos específicos
   common_tags = {
     Application = local.app
     Environment = local.env
   }
 }
 
-# 1) VPC y subredes
+# ------------------------------------------------------------------------------
+# VPC - Red virtual privada
+# ------------------------------------------------------------------------------
 module "vpc" {
   source               = "../../modules/vpc"
   name_prefix          = local.name_prefix
@@ -39,7 +52,9 @@ module "vpc" {
   private_subnet_cidrs = var.private_subnet_cidrs
 }
 
-# 2) NAT instance
+# ------------------------------------------------------------------------------
+# NAT INSTANCE - Salida a Internet para subnets privadas
+# ------------------------------------------------------------------------------
 module "nat" {
   source                  = "../../modules/nat-instance"
   name_prefix             = local.name_prefix
@@ -51,7 +66,9 @@ module "nat" {
   allowed_ssh_cidrs       = var.allowed_ssh_cidrs
 }
 
-# 3) Bastion
+# ------------------------------------------------------------------------------
+# BASTION - Jump server para acceso SSH
+# ------------------------------------------------------------------------------
 module "bastion" {
   source            = "../../modules/bastion"
   name_prefix       = local.name_prefix
@@ -62,7 +79,9 @@ module "bastion" {
   allowed_ssh_cidrs = var.allowed_ssh_cidrs
 }
 
-# 4) ALB
+# ------------------------------------------------------------------------------
+# ALB - Application Load Balancer
+# ------------------------------------------------------------------------------
 module "alb" {
   source               = "../../modules/alb"
   name_prefix          = local.name_prefix
@@ -72,33 +91,39 @@ module "alb" {
   backend_health_path  = "/api/health"
 }
 
-# 5) EC2 Frontend
+# ------------------------------------------------------------------------------
+# EC2 FRONTEND - Servidor web en subnet privada
+# ------------------------------------------------------------------------------
 module "frontend" {
-  source         = "../../modules/ec2-frontend"
-  name_prefix    = local.name_prefix
-  vpc_id         = module.vpc.vpc_id
-  subnet_id      = module.vpc.private_subnet_ids[0]
-  instance_type  = var.instance_type
-  key_name       = var.ssh_key_name
-  alb_sg_id      = module.alb.alb_sg_id
-  bastion_sg_id  = module.bastion.sg_id  # ← AGREGAR ESTO
-  tags           = local.common_tags      # ← AGREGAR ESTO
+  source        = "../../modules/ec2-frontend"
+  name_prefix   = local.name_prefix
+  vpc_id        = module.vpc.vpc_id
+  subnet_id     = module.vpc.private_subnet_ids[0]
+  instance_type = var.instance_type
+  key_name      = var.ssh_key_name
+  alb_sg_id     = module.alb.alb_sg_id
+  bastion_sg_id = module.bastion.sg_id
+  tags          = local.common_tags
 }
 
-# 6) EC2 Backend
+# ------------------------------------------------------------------------------
+# EC2 BACKEND - Servidor de aplicación en subnet privada
+# ------------------------------------------------------------------------------
 module "backend" {
-  source         = "../../modules/ec2-backend"
-  name_prefix    = local.name_prefix
-  vpc_id         = module.vpc.vpc_id
-  subnet_id      = module.vpc.private_subnet_ids[1]
-  instance_type  = var.instance_type
-  key_name       = var.ssh_key_name
-  alb_sg_id      = module.alb.alb_sg_id
-  bastion_sg_id  = module.bastion.sg_id  # ← AGREGAR ESTO
-  tags           = local.common_tags      # ← AGREGAR ESTO
+  source        = "../../modules/ec2-backend"
+  name_prefix   = local.name_prefix
+  vpc_id        = module.vpc.vpc_id
+  subnet_id     = module.vpc.private_subnet_ids[1]
+  instance_type = var.instance_type
+  key_name      = var.ssh_key_name
+  alb_sg_id     = module.alb.alb_sg_id
+  bastion_sg_id = module.bastion.sg_id
+  tags          = local.common_tags
 }
 
-# 7) Adjuntar instancias a Target Groups
+# ------------------------------------------------------------------------------
+# TARGET GROUP ATTACHMENTS - Registra instancias en el ALB
+# ------------------------------------------------------------------------------
 resource "aws_lb_target_group_attachment" "fe_attach" {
   target_group_arn = module.alb.tg_frontend_arn
   target_id        = module.frontend.instance_id
@@ -111,7 +136,9 @@ resource "aws_lb_target_group_attachment" "be_attach" {
   port             = 80
 }
 
-# 8) RDS MySQL
+# ------------------------------------------------------------------------------
+# RDS MYSQL - Base de datos en subnet privada
+# ------------------------------------------------------------------------------
 module "rds" {
   source             = "../../modules/rds-mysql"
   name_prefix        = local.name_prefix
@@ -125,9 +152,11 @@ module "rds" {
   allowed_sg_ids     = [module.backend.sg_id]
 }
 
-# 9) Monitoring ← AGREGAR MÓDULO NUEVO
+# ------------------------------------------------------------------------------
+# CLOUDWATCH - Monitoreo y alarmas
+# ------------------------------------------------------------------------------
 module "monitoring" {
-  source            = "../../modules/monitoring"
+  source            = "../../modules/cloudwatch"
   name_prefix       = local.name_prefix
   region            = var.region
   alb_arn_suffix    = module.alb.alb_arn_suffix

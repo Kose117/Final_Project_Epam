@@ -6,7 +6,6 @@ variable "private_subnet_cidrs" { type = list(string) }
 
 variable "instance_type"        { type = string }     # ej: t3.micro
 variable "ssh_key_name"         { type = string }     # TODO
-
 variable "allowed_ssh_cidrs"    { type = list(string) }  # limita tu IP
 
 variable "db_name"              { type = string }

@@ -1,5 +1,29 @@
-bucket               = "tf-state-jose-devops"  # TODO: cambia por tu bucket
-key                  = "root/terraform.tfstate"
-region               = "us-east-1"             # TODO: tu región
-use_lockfile         = true
+# ==============================================================================
+# BACKEND CONFIGURATION - Remote State Storage
+# ==============================================================================
+# Este archivo configura el backend remoto de Terraform para almacenar el state en AWS S3 con state locking nativo
+#
+# IMPORTANTE: Este archivo debe ser compartido por TODO el equipo.
+# Todos deben usar la misma configuración para colaborar sin conflictos.
+# ==============================================================================
+
+# Nombre del bucket S3 donde se almacenarán los state files
+# IMPORTANTE: Este bucket debe existir antes de ejecutar terraform init
+bucket = "tf-state-jose-devops"  # TODO: Cambiar por el bucket de tu equipo
+
+# Prefijo para organizar states por workspace
+# Estructura resultante:
+#   - Workspace "qa":   s3://bucket/env/qa/terraform.tfstate
+#   - Workspace "prod": s3://bucket/env/prod/terraform.tfstate
 workspace_key_prefix = "env"
+
+# Ruta base dentro del bucket para el state file
+# Con workspaces, la ruta final será: env/{workspace}/terraform.tfstate
+key = "root/terraform.tfstate"
+
+# Región AWS donde está ubicado el bucket
+region = "us-east-1"  # TODO: Cambiar si usas otra región
+
+# Habilita state locking nativo en S3
+# Esto crea un archivo .tflock junto al state para prevenir cambios concurrentes
+use_lockfile = true

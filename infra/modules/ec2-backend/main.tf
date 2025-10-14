@@ -1,6 +1,17 @@
+# ==============================================================================
+# EC2 BACKEND MODULE - Servidor de aplicación (Node.js/Express)
+# ==============================================================================
+# Instancia en subnet privada que sirve el backend API de la aplicación.
+# Solo acepta tráfico HTTP desde el ALB y SSH desde el Bastion.
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# AMI - Amazon Linux 2023
+# ------------------------------------------------------------------------------
 data "aws_ami" "al2023" {
   most_recent = true
   owners      = ["137112412989"]
+  
   filter {
     name   = "name"
     values = ["al2023-ami-*-kernel-6.1-x86_64"]
@@ -11,11 +22,14 @@ data "aws_ami" "al2023" {
   }
 }
 
+# ------------------------------------------------------------------------------
+# SECURITY GROUP - Reglas de firewall
+# ------------------------------------------------------------------------------
 resource "aws_security_group" "app" {
   name   = "${var.name_prefix}-be-sg"
   vpc_id = var.vpc_id
 
-  # Tráfico HTTP desde el ALB
+  # HTTP solo desde el ALB
   ingress {
     description     = "HTTP from ALB"
     from_port       = 80
@@ -24,7 +38,7 @@ resource "aws_security_group" "app" {
     security_groups = [var.alb_sg_id]
   }
 
-  # SSH desde Bastion ← AGREGAR ESTO
+  # SSH solo desde el Bastion
   ingress {
     description     = "SSH from Bastion"
     from_port       = 22
@@ -33,6 +47,7 @@ resource "aws_security_group" "app" {
     security_groups = [var.bastion_sg_id]
   }
 
+  # Permite todo el tráfico saliente
   egress {
     from_port   = 0
     to_port     = 0
@@ -43,9 +58,12 @@ resource "aws_security_group" "app" {
   tags = merge(
     var.tags,
     { Name = "${var.name_prefix}-be-sg" }
-  )  # ← TAGS DINÁMICOS
+  )
 }
 
+# ------------------------------------------------------------------------------
+# BACKEND INSTANCE
+# ------------------------------------------------------------------------------
 resource "aws_instance" "be" {
   ami                         = data.aws_ami.al2023.id
   instance_type               = var.instance_type
@@ -54,6 +72,8 @@ resource "aws_instance" "be" {
   key_name                    = var.key_name
   associate_public_ip_address = false
 
+  # Placeholder: servidor HTTP mínimo en Python
+  # Ansible instalará Node.js y la aplicación real posteriormente
   user_data = <<-EOF
     #!/bin/bash
     set -eux
@@ -76,5 +96,5 @@ PY
   tags = merge(
     var.tags,
     { Name = "${var.name_prefix}-be" }
-  )  # ← TAGS DINÁMICOS
+  )
 }

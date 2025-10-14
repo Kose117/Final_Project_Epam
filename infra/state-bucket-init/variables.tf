@@ -11,5 +11,9 @@ variable "bucket_name" {
 variable "tags" {
   description = "Etiquetas comunes"
   type        = map(string)
-  default     = { Project = "movie-analyst", Managed = "terraform", Scope = "state" }
+  default     = { 
+    Project   = "movie-analyst"
+    ManagedBy = "terraform"
+    Scope     = "state" 
+  }
 }
