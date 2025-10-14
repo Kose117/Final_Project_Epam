@@ -33,7 +33,7 @@ resource "aws_security_group" "bastion" {
   dynamic "ingress" {
     for_each = var.allowed_ssh_cidrs
     content {
-      description = "SSH"
+      description = "SSH from allowed IPs"
       from_port   = 22
       to_port     = 22
       protocol    = "tcp"
@@ -41,11 +41,30 @@ resource "aws_security_group" "bastion" {
     }
   }
 
-  # Permite todo el tráfico saliente
+  # Egress SSH solo a instancias privadas (más seguro)
   egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
+    description = "SSH to private instances"
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = var.private_subnet_cidrs  # Solo a subnets privadas
+  }
+
+  # Egress HTTPS para actualizaciones del sistema
+  egress {
+    description = "HTTPS for system updates"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  # Egress HTTP para repositorios
+  egress {
+    description = "HTTP for package repos"
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
 
@@ -62,6 +81,19 @@ resource "aws_instance" "bastion" {
   vpc_security_group_ids      = [aws_security_group.bastion.id]
   associate_public_ip_address = true
   key_name                    = var.key_name
+  
+  # Deshabilita acceso con contraseña, solo keypair
+  user_data = <<-EOF
+    #!/bin/bash
+    set -eux
+    # Deshabilita autenticación por password
+    sed -i 's/PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config
+    systemctl restart sshd
+    
+    # Instala fail2ban para protección contra ataques de fuerza bruta
+    dnf install -y fail2ban
+    systemctl enable --now fail2ban
+  EOF
 
   tags = { Name = "${var.name_prefix}-bastion" }
 }
