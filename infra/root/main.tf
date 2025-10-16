@@ -1,8 +1,10 @@
 # ==============================================================================
-# AMBIENTE PROD - Infraestructura de producción
+# ROOT MODULE - Infraestructura Unificada QA/Prod
 # ==============================================================================
-# Despliega toda la infraestructura en ambiente de Producción.
-# Usa workspace "prod" para separar el state de QA.
+# Módulo raíz único que se parametriza con variables.
+# Uso:
+#   terraform workspace select qa
+#   terraform apply -var-file=../environments/qa.tfvars
 # ==============================================================================
 
 terraform {
@@ -10,33 +12,30 @@ terraform {
   required_providers {
     aws = { source = "hashicorp/aws", version = "~> 5.0" }
   }
-  backend "s3" {}  // Configurado vía backend.hcl
+  backend "s3" {}  # Configurado vía backend.hcl
 }
 
 provider "aws" {
   region = var.region
   
-  # Tags aplicados automáticamente a TODOS los recursos
   default_tags {
     tags = {
-      Project     = "movie-analyst"
-      Environment = local.env
+      Project     = var.project_name
+      Environment = var.environment
       ManagedBy   = "terraform"
-      Team        = "devops"
-      CostCenter  = "migration-project"
+      Team        = var.team
+      CostCenter  = var.cost_center
     }
   }
 }
 
 locals {
-  app         = "movie-analyst"
-  env         = terraform.workspace  // Usa el nombre del workspace (prod)
-  name_prefix = "${local.app}-${local.env}"
+  name_prefix = "${var.project_name}-${var.environment}"
   
-  # Tags adicionales para recursos específicos
   common_tags = {
-    Application = local.app
-    Environment = local.env
+    Application = var.project_name
+    Environment = var.environment
+    Workspace   = terraform.workspace
   }
 }
 
@@ -44,7 +43,7 @@ locals {
 # VPC - Red virtual privada
 # ------------------------------------------------------------------------------
 module "vpc" {
-  source               = "../../modules/vpc"
+  source               = "../modules/vpc"
   name_prefix          = local.name_prefix
   cidr_block           = var.vpc_cidr
   azs                  = var.azs
@@ -56,7 +55,7 @@ module "vpc" {
 # NAT INSTANCE - Salida a Internet para subnets privadas
 # ------------------------------------------------------------------------------
 module "nat" {
-  source                  = "../../modules/nat-instance"
+  source                  = "../modules/nat-instance"
   name_prefix             = local.name_prefix
   vpc_id                  = module.vpc.vpc_id
   public_subnet_id        = module.vpc.public_subnet_ids[0]
@@ -68,24 +67,28 @@ module "nat" {
 }
 
 # ------------------------------------------------------------------------------
-# BASTION - Jump server para acceso SSH
+# BASTION - Jump server con Ansible pre-configurado
 # ------------------------------------------------------------------------------
 module "bastion" {
-  source            = "../../modules/bastion"
-  name_prefix       = local.name_prefix
-  vpc_id            = module.vpc.vpc_id
-  public_subnet_id  = module.vpc.public_subnet_ids[0]
+  source               = "../modules/bastion"
+  name_prefix          = local.name_prefix
+  vpc_id               = module.vpc.vpc_id
+  public_subnet_id     = module.vpc.public_subnet_ids[0]
   private_subnet_cidrs = var.private_subnet_cidrs
-  instance_type     = var.instance_type
-  key_name          = var.ssh_key_name
-  allowed_ssh_cidrs = var.allowed_ssh_cidrs
+  instance_type        = var.instance_type
+  key_name             = var.ssh_key_name
+  allowed_ssh_cidrs    = var.allowed_ssh_cidrs
+  
+  # Nueva variable para auto-configuración
+  enable_ansible_setup = true
+  ssh_private_key_content = var.ssh_private_key_content  # Opcional
 }
 
 # ------------------------------------------------------------------------------
 # ALB - Application Load Balancer
 # ------------------------------------------------------------------------------
 module "alb" {
-  source               = "../../modules/alb"
+  source               = "../modules/alb"
   name_prefix          = local.name_prefix
   vpc_id               = module.vpc.vpc_id
   public_subnet_ids    = module.vpc.public_subnet_ids
@@ -97,7 +100,7 @@ module "alb" {
 # EC2 FRONTEND - Servidor web en subnet privada
 # ------------------------------------------------------------------------------
 module "frontend" {
-  source        = "../../modules/ec2-frontend"
+  source        = "../modules/ec2-frontend"
   name_prefix   = local.name_prefix
   vpc_id        = module.vpc.vpc_id
   subnet_id     = module.vpc.private_subnet_ids[0]
@@ -109,18 +112,20 @@ module "frontend" {
 }
 
 # ------------------------------------------------------------------------------
-# EC2 BACKEND - Servidor de aplicación en subnet privada
+# EC2 BACKEND - Múltiples instancias para HA
 # ------------------------------------------------------------------------------
 module "backend" {
-  source        = "../../modules/ec2-backend"
-  name_prefix   = local.name_prefix
-  vpc_id        = module.vpc.vpc_id
-  subnet_id     = module.vpc.private_subnet_ids[1]
-  instance_type = var.instance_type
-  key_name      = var.ssh_key_name
-  alb_sg_id     = module.alb.alb_sg_id
-  bastion_sg_id = module.bastion.sg_id
-  tags          = local.common_tags
+  source = "../modules/ec2-backend"
+  
+  name_prefix       = local.name_prefix
+  vpc_id            = module.vpc.vpc_id
+  instance_count    = var.backend_instance_count  # 2 para HA
+  subnet_ids        = module.vpc.private_subnet_ids  # Distribuye en múltiples AZs
+  instance_type     = var.instance_type
+  key_name          = var.ssh_key_name
+  alb_sg_id         = module.alb.alb_sg_id
+  bastion_sg_id     = module.bastion.sg_id
+  tags              = local.common_tags
 }
 
 # ------------------------------------------------------------------------------
@@ -132,9 +137,11 @@ resource "aws_lb_target_group_attachment" "fe_attach" {
   port             = 80
 }
 
+# Attachments dinámicos para múltiples backends
 resource "aws_lb_target_group_attachment" "be_attach" {
+  count            = var.backend_instance_count
   target_group_arn = module.alb.tg_backend_arn
-  target_id        = module.backend.instance_id
+  target_id        = module.backend.instance_ids[count.index]
   port             = 80
 }
 
@@ -142,7 +149,7 @@ resource "aws_lb_target_group_attachment" "be_attach" {
 # RDS MYSQL - Base de datos en subnet privada
 # ------------------------------------------------------------------------------
 module "rds" {
-  source             = "../../modules/rds-mysql"
+  source             = "../modules/rds-mysql"
   name_prefix        = local.name_prefix
   vpc_id             = module.vpc.vpc_id
   private_subnet_ids = module.vpc.private_subnet_ids
@@ -158,13 +165,13 @@ module "rds" {
 # CLOUDWATCH - Monitoreo y alarmas
 # ------------------------------------------------------------------------------
 module "monitoring" {
-  source            = "../../modules/cloudwatch"
-  name_prefix       = local.name_prefix
-  region            = var.region
-  alb_arn_suffix    = module.alb.alb_arn_suffix
-  frontend_instance = module.frontend.instance_id
-  backend_instance  = module.backend.instance_id
-  rds_instance      = module.rds.db_instance_id
-  tg_frontend_arn   = module.alb.tg_frontend_arn_suffix
-  tg_backend_arn    = module.alb.tg_backend_arn_suffix
+  source             = "../modules/cloudwatch"
+  name_prefix        = local.name_prefix
+  region             = var.region
+  alb_arn_suffix     = module.alb.alb_arn_suffix
+  frontend_instance  = module.frontend.instance_id
+  backend_instances  = module.backend.instance_ids  # Lista de IDs
+  rds_instance       = module.rds.db_instance_id
+  tg_frontend_arn    = module.alb.tg_frontend_arn_suffix
+  tg_backend_arn     = module.alb.tg_backend_arn_suffix
 }
