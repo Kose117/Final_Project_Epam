@@ -8,8 +8,8 @@
 # ==============================================================================
 
 # Nombre del bucket S3 donde se almacenarán los state files
-# IMPORTANTE: Este bucket debe existir antes de ejecutar terraform init
-bucket = "tf-state-jose-devops"  # TODO: Cambiar por el bucket de tu equipo
+# Crea el bucket siguiendo el Paso 1 del README y reemplaza el valor de ejemplo.
+bucket = "movie-analyst-tfstate-equipodemo"
 
 # Prefijo para organizar states por workspace
 # Estructura resultante:
@@ -21,8 +21,8 @@ workspace_key_prefix = "env"
 # Con workspaces, la ruta final será: env/{workspace}/terraform.tfstate
 key = "root/terraform.tfstate"
 
-# Región AWS donde está ubicado el bucket
-region = "us-east-1"  # TODO: Cambiar si usas otra región
+# Región AWS donde está ubicado el bucket (us-east-1 si sigues la guía paso a paso)
+region = "us-east-1"
 
 # Habilita state locking nativo en S3
 # Esto crea un archivo .tflock junto al state para prevenir cambios concurrentes

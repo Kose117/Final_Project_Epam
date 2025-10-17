@@ -1,5 +1,9 @@
 output "vpc_id"                 { value = aws_vpc.this.id }
-output "public_subnet_ids"      { value = [for s in aws_subnet.public  : s.id] }
-output "private_subnet_ids"     { value = [for s in aws_subnet.private : s.id] }
+output "public_subnet_ids"      { value = [for s in aws_subnet.public   : s.id] }
+output "frontend_subnet_ids"    { value = [for s in aws_subnet.frontend : s.id] }
+output "backend_subnet_ids"     { value = [for s in aws_subnet.backend  : s.id] }
+output "db_subnet_ids"          { value = [for s in aws_subnet.db       : s.id] }
 output "public_route_table_id"  { value = aws_route_table.public.id }
-output "private_route_table_ids"{ value = [for rt in aws_route_table.private : rt.id] }
+output "frontend_route_table_ids" { value = [for rt in aws_route_table.frontend : rt.id] }
+output "backend_route_table_ids"  { value = [for rt in aws_route_table.backend  : rt.id] }
+output "db_route_table_ids"       { value = [for rt in aws_route_table.db      : rt.id] }

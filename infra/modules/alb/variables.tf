@@ -11,3 +11,9 @@ variable "backend_health_path" {
   type    = string
   default = "/api/health"
 }
+
+variable "enable_backend_listener" {
+  description = "Permite enrutar /api/* hacia el backend cuando es true"
+  type        = bool
+  default     = true
+}
