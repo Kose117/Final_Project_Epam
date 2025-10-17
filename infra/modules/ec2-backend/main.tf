@@ -66,13 +66,13 @@ resource "aws_security_group" "app" {
 # ------------------------------------------------------------------------------
 resource "aws_instance" "be" {
   count = var.instance_count
-  
-  ami                         = data.aws_ami.al2023.id
-  instance_type               = var.instance_type
-  
+
+  ami           = data.aws_ami.al2023.id
+  instance_type = var.instance_type
+
   # Distribuye instancias en diferentes subnets (diferentes AZs)
-  subnet_id                   = var.subnet_ids[count.index % length(var.subnet_ids)]
-  
+  subnet_id = var.subnet_ids[count.index % length(var.subnet_ids)]
+
   vpc_security_group_ids      = [aws_security_group.app.id]
   key_name                    = var.key_name
   associate_public_ip_address = false
@@ -107,9 +107,9 @@ PY
 
   tags = merge(
     var.tags,
-    { 
-      Name = "${var.name_prefix}-be-${count.index + 1}"
-      Role = "backend"
+    {
+      Name     = "${var.name_prefix}-be-${count.index + 1}"
+      Role     = "backend"
       Instance = "${count.index + 1}"
     }
   )

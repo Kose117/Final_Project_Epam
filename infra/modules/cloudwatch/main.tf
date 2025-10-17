@@ -5,6 +5,22 @@
 # Solución in-house sin costos adicionales (requisito del cliente).
 # ==============================================================================
 
+locals {
+  backend_cpu_metrics = [
+    for id in var.backend_instances :
+    [
+      "AWS/EC2",
+      "CPUUtilization",
+      "InstanceId",
+      id,
+      {
+        "stat"  = "Average",
+        "label" = "Backend ${replace(id, "i-", "")}" 
+      }
+    ]
+  ]
+}
+
 # ------------------------------------------------------------------------------
 # DASHBOARD - Panel de métricas
 # ------------------------------------------------------------------------------
@@ -16,11 +32,27 @@ resource "aws_cloudwatch_dashboard" "main" {
       {
         type = "metric"
         properties = {
-          metrics = [
-            ["AWS/EC2", "CPUUtilization", { stat = "Average", label = "Frontend CPU" }],
-            ["...", { stat = "Average", label = "Backend CPU" }],
-            ["AWS/RDS", "CPUUtilization", { stat = "Average", label = "RDS CPU" }]
-          ]
+          metrics = concat(
+            [
+              [
+                "AWS/EC2",
+                "CPUUtilization",
+                "InstanceId",
+                var.frontend_instance,
+                { "stat" = "Average", "label" = "Frontend" }
+              ]
+            ],
+            local.backend_cpu_metrics,
+            [
+              [
+                "AWS/RDS",
+                "CPUUtilization",
+                "DBInstanceIdentifier",
+                var.rds_instance,
+                { "stat" = "Average", "label" = "RDS" }
+              ]
+            ]
+          )
           period = 300  // 5 minutos
           region = var.region
           title  = "CPU Utilization"
@@ -79,7 +111,8 @@ resource "aws_cloudwatch_metric_alarm" "frontend_cpu" {
 # ALARM - CPU alto en Backend
 # ------------------------------------------------------------------------------
 resource "aws_cloudwatch_metric_alarm" "backend_cpu" {
-  alarm_name          = "${var.name_prefix}-backend-high-cpu"
+  for_each            = { for id in var.backend_instances : id => id }
+  alarm_name          = format("%s-%s-backend-high-cpu", var.name_prefix, replace(each.key, "-", ""))
   comparison_operator = "GreaterThanThreshold"
   evaluation_periods  = 2
   metric_name         = "CPUUtilization"
@@ -91,7 +124,7 @@ resource "aws_cloudwatch_metric_alarm" "backend_cpu" {
   treat_missing_data  = "notBreaching"
 
   dimensions = {
-    InstanceId = var.backend_instance
+    InstanceId = each.value
   }
 }
 

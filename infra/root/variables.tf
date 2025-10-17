@@ -91,6 +91,16 @@ variable "instance_type" {
   default     = "t3.micro"
 }
 
+variable "backend_instance_count" {
+  description = "Número de instancias EC2 para el backend"
+  type        = number
+  default     = 1
+  validation {
+    condition     = var.backend_instance_count >= 1
+    error_message = "backend_instance_count debe ser al menos 1"
+  }
+}
+
 variable "ssh_key_name" {
   description = "Nombre del key pair SSH en AWS"
   type        = string

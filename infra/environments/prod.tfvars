@@ -33,6 +33,7 @@ private_subnet_cidrs = ["10.20.11.0/24", "10.20.12.0/24"]
 # Compute - EC2 Instances
 # ------------------------------------------------------------------------------
 instance_type = "t3.micro"  # Considerar t3.small o t3.medium para producción real
+backend_instance_count = 2
 
 # ⚠️ TODO: CAMBIAR POR TU KEY PAIR
 ssh_key_name = "devops-keypair"
