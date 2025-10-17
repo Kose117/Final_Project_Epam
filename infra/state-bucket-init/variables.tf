@@ -14,6 +14,11 @@ variable "tags" {
   default     = { 
     Project   = "movie-analyst"
     ManagedBy = "terraform"
-    Scope     = "state" 
+    Scope     = "state"
   }
+}
+variable "iam_usernames" {
+  description = "Lista de usuarios IAM a los que se adjuntará la política mínima para gestionar el bucket del tfstate"
+  type        = list(string)
+  default     = []
 }

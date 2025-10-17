@@ -1,24 +1,3 @@
-# ==============================================================================
-# TERRAFORM STATE BUCKET - Inicialización
-# ==============================================================================
-# Este archivo crea la infraestructura necesaria para almacenar el state remoto
-# de Terraform de forma segura en AWS S3.
-#
-# COMPONENTES:
-# - Bucket S3 con versionamiento y encriptación
-# - Configuración de seguridad (acceso público bloqueado, SSL obligatorio)
-# ==============================================================================
-terraform {
-  required_version = ">= 1.9.0"
-  required_providers {
-    aws = { source = "hashicorp/aws", version = "~> 5.0" }
-  }
-}
-
-provider "aws" {
-  region = var.region
-}
-
 # ------------------------------------------------------------------------------
 # S3 BUCKET - Almacenamiento del Terraform State
 # ------------------------------------------------------------------------------
@@ -30,6 +9,12 @@ resource "aws_s3_bucket" "tf_state" {
   force_destroy = false  // Protección: no destruir el bucket si contiene objetos
 
   tags = merge(var.tags, { Name = var.bucket_name })
+}
+
+locals {
+  bucket_arn          = aws_s3_bucket.tf_state.arn
+  bucket_objects_arn  = "${aws_s3_bucket.tf_state.arn}/*"
+  attach_iam_policies = length(var.iam_usernames) > 0
 }
 
 # ------------------------------------------------------------------------------
@@ -58,62 +43,27 @@ resource "aws_s3_bucket_public_access_block" "this" {
   block_public_acls       = true  // Bloquea nuevas ACLs públicas
   block_public_policy     = true  // Bloquea nuevas políticas públicas
   ignore_public_acls      = true  // Ignora ACLs públicas existentes
-  restrict_public_buckets = true  // Restringe acceso público vía bucket policies
+  restrict_public_buckets = true  // Restringe acceso público
 }
 
-# ------------------------------------------------------------------------------
-# VERSIONING - Versionamiento de objetos
-# ------------------------------------------------------------------------------
-# Mantiene versiones históricas del state file. Si alguien destruye recursos
-# accidentalmente, podemos recuperar un state anterior.
-# ------------------------------------------------------------------------------
-resource "aws_s3_bucket_versioning" "this" {
-  bucket = aws_s3_bucket.tf_state.id
-
-  versioning_configuration {
-    status = "Enabled"  // Activa el versionamiento
-  }
-}
-
-# ------------------------------------------------------------------------------
-# ENCRYPTION - Encriptación en reposo
-# ------------------------------------------------------------------------------
-# Encripta todos los objetos del bucket automáticamente usando AES-256.
-# ------------------------------------------------------------------------------
-resource "aws_s3_bucket_server_side_encryption_configuration" "this" {
-  bucket = aws_s3_bucket.tf_state.id
-
-  rule {
-    apply_server_side_encryption_by_default {
-      sse_algorithm = "AES256"  // Algoritmo de encriptación administrado por S3
-    }
-  }
-}
-
-# ------------------------------------------------------------------------------
-# IAM POLICY DOCUMENT - Política de seguridad SSL/TLS
-# ------------------------------------------------------------------------------
-# Define una política que NIEGA cualquier operación que no use SSL/TLS.
-# Esto previene que datos sensibles se transmitan sin encriptar.
-# ------------------------------------------------------------------------------
 data "aws_iam_policy_document" "deny_insecure_transport" {
   statement {
-    sid    = "DenyInsecureTransport"
-    effect = "Deny"  // NIEGA explícitamente (más fuerte que "Allow")
-    
-    actions = ["s3:*"]  // Aplica a TODAS las operaciones de S3
+    sid     = "DenyInsecureTransport"
+    effect  = "Deny"
+    actions = ["s3:*"]
 
     resources = [
-      aws_s3_bucket.tf_state.arn,          // ARN del bucket
-      "${aws_s3_bucket.tf_state.arn}/*"   // ARN de todos los objetos dentro
+      aws_s3_bucket.tf_state.arn,
+      "${aws_s3_bucket.tf_state.arn}/*",
     ]
 
     principals {
-      type        = "*"  // Aplica a cualquier principal (usuario, rol, servicio)
+      // Aplica a cualquier principal
+      type        = "*"
       identifiers = ["*"]
     }
 
-    // Condición: solo niega si SecureTransport es false (no HTTPS)
+    // Condición: niega solo si NO es HTTPS
     condition {
       test     = "Bool"
       variable = "aws:SecureTransport"
@@ -121,6 +71,7 @@ data "aws_iam_policy_document" "deny_insecure_transport" {
     }
   }
 }
+
 
 # ------------------------------------------------------------------------------
 # BUCKET POLICY - Aplicación de la política de seguridad
@@ -131,4 +82,96 @@ data "aws_iam_policy_document" "deny_insecure_transport" {
 resource "aws_s3_bucket_policy" "this" {
   bucket = aws_s3_bucket.tf_state.id
   policy = data.aws_iam_policy_document.deny_insecure_transport.json
+}
+
+# ------------------------------------------------------------------------------
+# IAM POLICY - Permisos mínimos para gestionar el bucket del tfstate
+# ------------------------------------------------------------------------------
+# Algunos equipos utilizan usuarios IAM sin privilegios de administrador. Para
+# facilitar la creación del bucket, se puede adjuntar automáticamente una
+# política con los permisos mínimos requeridos (crear el bucket, aplicar
+# versionamiento, encriptación, políticas y gestionar objetos del state).
+# ------------------------------------------------------------------------------
+data "aws_iam_policy_document" "state_bucket_access" {
+  count = local.attach_iam_policies ? 1 : 0
+
+  statement {
+    sid    = "AllowBucketCreation"
+    effect = "Allow"
+
+    actions   = ["s3:CreateBucket"]
+    resources = ["*"]
+  }
+
+  statement {
+    sid    = "ManageBucketConfiguration"
+    effect = "Allow"
+
+    actions = [
+      "s3:DeleteBucket",
+      "s3:DeleteBucketPolicy",
+      "s3:DeleteBucketPublicAccessBlock",
+      "s3:DeleteBucketOwnershipControls",
+      "s3:DeleteBucketTagging",
+      "s3:GetBucketAcl",
+      "s3:GetBucketLocation",
+      "s3:GetBucketPolicy",
+      "s3:GetBucketPolicyStatus",
+      "s3:GetBucketPublicAccessBlock",
+      "s3:GetBucketTagging",
+      "s3:GetBucketVersioning",
+      "s3:GetEncryptionConfiguration",
+      "s3:ListBucket",
+      "s3:ListBucketVersions",
+      "s3:PutBucketAcl",
+      "s3:PutBucketPolicy",
+      "s3:PutBucketPublicAccessBlock",
+      "s3:PutBucketOwnershipControls",
+      "s3:PutBucketTagging",
+      "s3:PutBucketVersioning",
+      "s3:PutEncryptionConfiguration"
+    ]
+
+    resources = [
+      local.bucket_arn
+    ]
+  }
+
+  statement {
+    sid    = "ManageStateObjects"
+    effect = "Allow"
+
+    actions = [
+      "s3:DeleteObject",
+      "s3:DeleteObjectVersion",
+      "s3:GetObject",
+      "s3:GetObjectVersion",
+      "s3:ListBucketMultipartUploads",
+      "s3:ListMultipartUploadParts",
+      "s3:PutObject"
+    ]
+
+    resources = [
+      local.bucket_objects_arn
+    ]
+  }
+}
+
+resource "aws_iam_policy" "state_bucket_access" {
+  count = local.attach_iam_policies ? 1 : 0
+
+  name        = "${var.bucket_name}-state-admin"
+  description = "Permisos mínimos para gestionar el bucket del Terraform state ${var.bucket_name}"
+  policy      = data.aws_iam_policy_document.state_bucket_access[0].json
+
+  tags = merge(var.tags, {
+    Name = "${var.bucket_name}-state-admin"
+  })
+}
+
+resource "aws_iam_user_policy_attachment" "state_bucket_access" {
+  for_each = local.attach_iam_policies ? toset(var.iam_usernames) : {}
+
+  user       = each.value
+  policy_arn = aws_iam_policy.state_bucket_access[0].arn
 }

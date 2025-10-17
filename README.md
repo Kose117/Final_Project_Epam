@@ -200,14 +200,12 @@ curl ifconfig.me
 
 Si la salida es `203.0.113.25`, la notación CIDR sería `203.0.113.25/32`. Usa esta cadena en la variable `allowed_ssh_cidrs` para limitar el acceso SSH al bastion.
 
-### Paso 4: Generar la contraseña de la base de datos y exportarla
-Genera una contraseña robusta y expórtala como variable de entorno antes de ejecutar Terraform:
+### Paso 4: Definir la contraseña de la base de datos
+
+En lugar de generar una contraseña aleatoria, define directamente una contraseña fuerte.  
 
 ```bash
-export TF_VAR_db_password="$(openssl rand -base64 24)"
-```
-
-Si prefieres una contraseña concreta, reemplaza el comando por tu propio valor fuerte (al menos 12 caracteres con mayúsculas, minúsculas, números y símbolos).
+export TF_VAR_db_password="Josemanuel2003*"
 
 ### Paso 5: Copiar el template de variables y personalizarlo
 

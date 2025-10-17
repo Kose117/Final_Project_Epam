@@ -1,0 +1,51 @@
+- backend-config
+  - backend.hcl
+- environments
+  - prod.tfvars
+  - qa.tfvars
+- modules
+  - alb
+    - main.tf
+    - outputs.tf
+    - variables.tf
+  - alb-internal
+    - main.tf
+    - outputs.tf
+    - variables.tf
+  - bastion
+    - main.tf
+    - outputs.tf
+    - variables.tf
+  - cloudwatch
+    - main.tf
+    - outputs.tf
+    - variables.tf
+  - ec2-backend
+    - main.tf
+    - outputs.tf
+    - variables.tf
+  - ec2-frontend
+    - main.tf
+    - outputs.tf
+    - variables.tf
+  - nat-instance
+    - main.tf
+    - outputs.tf
+    - variables.tf
+  - rds-mysql
+    - main.tf
+    - outputs.tf
+    - variables.tf
+  - vpc
+    - main.tf
+    - outputs.tf
+    - variables.tf
+- root
+  - main.tf
+  - outputs.tf
+  - terraform.tfvars
+  - variables.tf
+- state-bucket-init
+  - main.tf
+  - outputs.tf
+  - variables.tf
