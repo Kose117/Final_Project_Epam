@@ -73,12 +73,30 @@ variable "public_subnet_cidrs" {
   }
 }
 
-variable "private_subnet_cidrs" {
-  description = "Lista de CIDRs para subnets privadas"
+variable "frontend_subnet_cidrs" {
+  description = "Lista de CIDRs para la capa de frontend (subnets privadas)"
   type        = list(string)
   validation {
-    condition     = length(var.private_subnet_cidrs) >= 2
-    error_message = "Debe especificar al menos 2 subnets privadas"
+    condition     = length(var.frontend_subnet_cidrs) >= 2
+    error_message = "Debe especificar al menos 2 subnets privadas para el frontend"
+  }
+}
+
+variable "backend_subnet_cidrs" {
+  description = "Lista de CIDRs para la capa de backend (subnets privadas)"
+  type        = list(string)
+  validation {
+    condition     = length(var.backend_subnet_cidrs) >= 2
+    error_message = "Debe especificar al menos 2 subnets privadas para el backend"
+  }
+}
+
+variable "db_subnet_cidrs" {
+  description = "Lista de CIDRs para la capa de datos (subnets privadas exclusivas de RDS)"
+  type        = list(string)
+  validation {
+    condition     = length(var.db_subnet_cidrs) >= 2
+    error_message = "Debe especificar al menos 2 subnets privadas para la capa de datos"
   }
 }
 
