@@ -58,14 +58,14 @@ output "ansible_connection_info" {
     public_alb_dns  = module.alb_public.alb_dns_name
     internal_alb_dns = module.alb_internal.alb_dns_name
     ssh_user      = "ec2-user"
-    ssh_key_path  = "~/.ssh/${var.ssh_key_name}.pem"
-    
+    ssh_key_path  = module.ssh_key.private_key_path
+
     # Comandos SSH útiles
-    ssh_to_bastion  = "ssh -i ~/.ssh/${var.ssh_key_name}.pem ec2-user@${module.bastion.public_ip}"
-    ssh_to_frontend = "ssh -J ec2-user@${module.bastion.public_ip} ec2-user@${module.frontend.private_ip}"
+    ssh_to_bastion  = "ssh -i \"${module.ssh_key.private_key_path}\" ec2-user@${module.bastion.public_ip}"
+    ssh_to_frontend = "ssh -J ec2-user@${module.bastion.public_ip} -i \"${module.ssh_key.private_key_path}\" ec2-user@${module.frontend.private_ip}"
     ssh_to_backends = [  # ✅ LISTA
       for ip in module.backend.private_ips :
-      "ssh -J ec2-user@${module.bastion.public_ip} ec2-user@${ip}"
+      "ssh -J ec2-user@${module.bastion.public_ip} -i \"${module.ssh_key.private_key_path}\" ec2-user@${ip}"
     ]
   }
   description = "Información de conexión para Ansible y SSH"
@@ -76,25 +76,25 @@ output "ansible_connection_info" {
 # ------------------------------------------------------------------------------
 output "next_steps" {
   value = <<-EOT
-  
+
   ╔════════════════════════════════════════════════════════════════════════╗
   ║  ✅ INFRAESTRUCTURA DESPLEGADA EXITOSAMENTE - ${upper(var.environment)}
   ╚════════════════════════════════════════════════════════════════════════╝
-  
+
   📋 INFORMACIÓN CLAVE:
-  
+
   🌐 Frontend:      http://${module.alb_public.alb_dns_name}
-  🖥️  Bastion SSH:   ssh -i ~/.ssh/${var.ssh_key_name}.pem ec2-user@${module.bastion.public_ip}
+  🖥️  Bastion SSH:   ssh -i "${module.ssh_key.private_key_path}" ec2-user@${module.bastion.public_ip}
   💾 Base de Datos: ${module.rds.endpoint}
   📊 Monitoreo:     AWS Console → CloudWatch → Dashboards
-  
+
   🔧 SIGUIENTE PASOS:
-  
+
   1️⃣  Conectarse al Bastion:
-      ssh -i ~/.ssh/${var.ssh_key_name}.pem ec2-user@${module.bastion.public_ip}
-  
+      ssh -i "${module.ssh_key.private_key_path}" ec2-user@${module.bastion.public_ip}
+
   2️⃣  Configurar Ansible en el Bastion (ver documentación)
-  
+
   3️⃣  Crear inventario de Ansible con estas IPs:
       Frontend: ${module.frontend.private_ip}
       Backends: ${join(", ", module.backend.private_ips)}
@@ -105,7 +105,12 @@ output "next_steps" {
   5️⃣  Verificar aplicación:
       curl http://${module.alb_public.alb_dns_name}/
       # Las rutas /api/* ahora están disponibles solo dentro de la VPC vía ${module.alb_internal.alb_dns_name}
-  
+
   EOT
   description = "Instrucciones para los siguientes pasos"
+}
+
+output "ssh_private_key_path" {
+  value       = module.ssh_key.private_key_path
+  description = "Ruta local del archivo PEM generado para el acceso SSH"
 }

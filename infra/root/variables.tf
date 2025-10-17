@@ -129,6 +129,18 @@ variable "allowed_ssh_cidrs" {
   type        = list(string)
 }
 
+variable "generate_ssh_key" {
+  description = "Si es true, Terraform generará y registrará automáticamente el key pair en AWS"
+  type        = bool
+  default     = true
+}
+
+variable "ssh_private_key_path" {
+  description = "Ruta absoluta donde guardar la llave privada generada (por defecto ~/.ssh/<key_name>.pem)"
+  type        = string
+  default     = null
+}
+
 # ------------------------------------------------------------------------------
 # Database
 # ------------------------------------------------------------------------------

@@ -12,7 +12,9 @@
 terraform {
   required_version = ">= 1.9.0"
   required_providers {
-    aws = { source = "hashicorp/aws", version = "~> 5.0" }
+    aws   = { source = "hashicorp/aws", version = "~> 5.0" }
+    tls   = { source = "hashicorp/tls", version = "~> 4.0" }
+    local = { source = "hashicorp/local", version = "~> 2.4" }
   }
   backend "s3" {}  # Configurado vía backend.hcl
 }
@@ -37,12 +39,23 @@ provider "aws" {
 # ------------------------------------------------------------------------------
 locals {
   name_prefix = "${var.project_name}-${var.environment}"
-  
+
   common_tags = {
     Application = var.project_name
     Environment = var.environment
     Workspace   = terraform.workspace
   }
+}
+
+# ------------------------------------------------------------------------------
+# SSH KEY - Generación automática del key pair de acceso
+# ------------------------------------------------------------------------------
+module "ssh_key" {
+  source           = "../modules/ssh-key"
+  key_name         = var.ssh_key_name
+  private_key_path = var.ssh_private_key_path
+  create           = var.generate_ssh_key
+  tags             = local.common_tags
 }
 
 # ------------------------------------------------------------------------------
@@ -70,7 +83,7 @@ module "nat" {
   private_route_table_ids = concat(module.vpc.frontend_route_table_ids, module.vpc.backend_route_table_ids)
   private_subnet_cidrs    = concat(var.frontend_subnet_cidrs, var.backend_subnet_cidrs)
   instance_type           = var.instance_type
-  key_name                = var.ssh_key_name
+  key_name                = module.ssh_key.key_name
   allowed_ssh_cidrs       = var.allowed_ssh_cidrs
 }
 
@@ -84,7 +97,7 @@ module "bastion" {
   public_subnet_id     = module.vpc.public_subnet_ids[0]
   private_subnet_cidrs = concat(var.frontend_subnet_cidrs, var.backend_subnet_cidrs)
   instance_type        = var.instance_type
-  key_name             = var.ssh_key_name
+  key_name             = module.ssh_key.key_name
   allowed_ssh_cidrs    = var.allowed_ssh_cidrs
 }
 
@@ -109,7 +122,7 @@ module "frontend" {
   vpc_id        = module.vpc.vpc_id
   subnet_id     = module.vpc.frontend_subnet_ids[0]
   instance_type = var.instance_type
-  key_name      = var.ssh_key_name
+  key_name      = module.ssh_key.key_name
   alb_sg_id     = module.alb_public.alb_sg_id
   bastion_sg_id = module.bastion.sg_id
   tags          = local.common_tags
@@ -137,7 +150,7 @@ module "backend" {
   subnet_ids     = module.vpc.backend_subnet_ids
   instance_count = var.backend_instance_count
   instance_type  = var.instance_type
-  key_name       = var.ssh_key_name
+  key_name       = module.ssh_key.key_name
   alb_sg_id      = module.alb_internal.alb_sg_id
   bastion_sg_id  = module.bastion.sg_id
   tags           = local.common_tags

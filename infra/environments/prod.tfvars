@@ -37,8 +37,14 @@ db_subnet_cidrs       = ["10.20.21.0/24", "10.20.22.0/24"]
 instance_type = "t3.micro"  # Considerar t3.small o t3.medium para producción real
 backend_instance_count = 2
 
-# Nombre del key pair corporativo (ver Paso 2 del README)
+# Nombre del key pair corporativo. Terraform lo genera si generate_ssh_key = true
 ssh_key_name = "movie-analyst-prod"
+
+# Terraform generará la llave en la primera ejecución. Ponlo en false solo si ya existe.
+generate_ssh_key = true
+
+# Opcional: personaliza la ruta local del archivo PEM.
+# ssh_private_key_path = "~/.ssh/movie-analyst-prod.pem"
 
 # Restringe el acceso SSH a la IP de tu oficina/VPN en formato /32 (Paso 3 del README)
 allowed_ssh_cidrs = ["198.51.100.42/32"]
