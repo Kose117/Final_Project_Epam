@@ -49,41 +49,42 @@ locals {
 # VPC - Red virtual privada
 # ------------------------------------------------------------------------------
 module "vpc" {
-  source               = "../modules/vpc"
-  name_prefix          = local.name_prefix
-  cidr_block           = var.vpc_cidr
-  azs                  = var.azs
-  public_subnet_cidrs  = var.public_subnet_cidrs
-  private_subnet_cidrs = var.private_subnet_cidrs
+  source              = "../modules/vpc"
+  name_prefix         = local.name_prefix
+  cidr_block          = var.vpc_cidr
+  azs                 = var.azs
+  public_subnet_cidrs = var.public_subnet_cidrs
+  app_subnet_cidrs    = var.app_subnet_cidrs
+  db_subnet_cidrs     = var.db_subnet_cidrs
 }
 
 # ------------------------------------------------------------------------------
-# NAT INSTANCE - Salida a Internet para subnets privadas
+# NAT INSTANCE - Salida a Internet para la capa de aplicación
 # ------------------------------------------------------------------------------
 module "nat" {
-  source                  = "../modules/nat-instance"
-  name_prefix             = local.name_prefix
-  vpc_id                  = module.vpc.vpc_id
-  public_subnet_id        = module.vpc.public_subnet_ids[0]
-  private_route_table_ids = module.vpc.private_route_table_ids
-  private_subnet_cidrs    = var.private_subnet_cidrs
-  instance_type           = var.instance_type
-  key_name                = var.ssh_key_name
-  allowed_ssh_cidrs       = var.allowed_ssh_cidrs
+  source               = "../modules/nat-instance"
+  name_prefix          = local.name_prefix
+  vpc_id               = module.vpc.vpc_id
+  public_subnet_id     = module.vpc.public_subnet_ids[0]
+  app_route_table_ids  = module.vpc.app_route_table_ids
+  app_subnet_cidrs     = var.app_subnet_cidrs
+  instance_type        = var.instance_type
+  key_name             = var.ssh_key_name
+  allowed_ssh_cidrs    = var.allowed_ssh_cidrs
 }
 
 # ------------------------------------------------------------------------------
 # BASTION - Jump server para acceso SSH
 # ------------------------------------------------------------------------------
 module "bastion" {
-  source               = "../modules/bastion"
-  name_prefix          = local.name_prefix
-  vpc_id               = module.vpc.vpc_id
-  public_subnet_id     = module.vpc.public_subnet_ids[0]
-  private_subnet_cidrs = var.private_subnet_cidrs
-  instance_type        = var.instance_type
-  key_name             = var.ssh_key_name
-  allowed_ssh_cidrs    = var.allowed_ssh_cidrs
+  source            = "../modules/bastion"
+  name_prefix       = local.name_prefix
+  vpc_id            = module.vpc.vpc_id
+  public_subnet_id  = module.vpc.public_subnet_ids[0]
+  app_subnet_cidrs  = var.app_subnet_cidrs
+  instance_type     = var.instance_type
+  key_name          = var.ssh_key_name
+  allowed_ssh_cidrs = var.allowed_ssh_cidrs
 }
 
 # ------------------------------------------------------------------------------
@@ -105,7 +106,7 @@ module "frontend" {
   source        = "../modules/ec2-frontend"
   name_prefix   = local.name_prefix
   vpc_id        = module.vpc.vpc_id
-  subnet_id     = module.vpc.private_subnet_ids[0]
+  subnet_id     = module.vpc.app_subnet_ids[0]
   instance_type = var.instance_type
   key_name      = var.ssh_key_name
   alb_sg_id     = module.alb.alb_sg_id
@@ -117,16 +118,16 @@ module "frontend" {
 # EC2 BACKEND - Servidor de aplicación en subnet privada
 # ------------------------------------------------------------------------------
 module "backend" {
-  source        = "../modules/ec2-backend"
-  name_prefix   = local.name_prefix
-  vpc_id        = module.vpc.vpc_id
-  subnet_ids    = module.vpc.private_subnet_ids
+  source         = "../modules/ec2-backend"
+  name_prefix    = local.name_prefix
+  vpc_id         = module.vpc.vpc_id
+  subnet_ids     = module.vpc.app_subnet_ids
   instance_count = var.backend_instance_count
-  instance_type = var.instance_type
-  key_name      = var.ssh_key_name
-  alb_sg_id     = module.alb.alb_sg_id
-  bastion_sg_id = module.bastion.sg_id
-  tags          = local.common_tags
+  instance_type  = var.instance_type
+  key_name       = var.ssh_key_name
+  alb_sg_id      = module.alb.alb_sg_id
+  bastion_sg_id  = module.bastion.sg_id
+  tags           = local.common_tags
 }
 
 # ------------------------------------------------------------------------------
@@ -146,19 +147,19 @@ resource "aws_lb_target_group_attachment" "be_attach" {
 }
 
 # ------------------------------------------------------------------------------
-# RDS MYSQL - Base de datos en subnet privada
+# RDS MYSQL - Base de datos en subnets de la capa de datos
 # ------------------------------------------------------------------------------
 module "rds" {
-  source             = "../modules/rds-mysql"
-  name_prefix        = local.name_prefix
-  vpc_id             = module.vpc.vpc_id
-  private_subnet_ids = module.vpc.private_subnet_ids
-  db_name            = var.db_name
-  username           = var.db_username
-  password           = var.db_password
-  instance_class     = var.db_instance_class
-  allocated_storage  = var.db_allocated_storage
-  allowed_sg_ids     = [module.backend.sg_id]
+  source            = "../modules/rds-mysql"
+  name_prefix       = local.name_prefix
+  vpc_id            = module.vpc.vpc_id
+  db_subnet_ids     = module.vpc.db_subnet_ids
+  db_name           = var.db_name
+  username          = var.db_username
+  password          = var.db_password
+  instance_class    = var.db_instance_class
+  allocated_storage = var.db_allocated_storage
+  allowed_sg_ids    = [module.backend.sg_id]
 }
 
 # ------------------------------------------------------------------------------
