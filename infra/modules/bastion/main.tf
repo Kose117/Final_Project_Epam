@@ -47,7 +47,7 @@ resource "aws_security_group" "bastion" {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = var.private_subnet_cidrs  # Solo a subnets privadas
+    cidr_blocks = var.app_subnet_cidrs  # Solo a subnets privadas de aplicación
   }
 
   # Egress HTTPS para actualizaciones del sistema
