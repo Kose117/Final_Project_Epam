@@ -29,9 +29,9 @@ resource "aws_security_group" "nat" {
   description = "NAT instance SG"
   vpc_id      = var.vpc_id
 
-  # SSH solo desde IPs permitidas
+  # Permite HTTP/HTTPS únicamente desde las subnets de aplicación
   dynamic "ingress" {
-    for_each = var.private_subnet_cidrs
+    for_each = var.app_subnet_cidrs
     content {
       description = "HTTP from private subnets"
       from_port   = 80
@@ -42,7 +42,7 @@ resource "aws_security_group" "nat" {
   }
 
   dynamic "ingress" {
-    for_each = var.private_subnet_cidrs
+    for_each = var.app_subnet_cidrs
     content {
       description = "HTTPS from private subnets"
       from_port   = 443
@@ -118,10 +118,10 @@ resource "aws_instance" "nat" {
 # ------------------------------------------------------------------------------
 # ROUTES - Rutas default hacia la instancia NAT
 # ------------------------------------------------------------------------------
-# Agrega ruta 0.0.0.0/0 -> NAT instance en cada tabla de rutas privada.
+# Agrega ruta 0.0.0.0/0 -> NAT instance en cada tabla de rutas de la capa de aplicación.
 # ------------------------------------------------------------------------------
 resource "aws_route" "private_default" {
-  for_each               = toset(var.private_route_table_ids)
+  for_each               = toset(var.app_route_table_ids)
   route_table_id         = each.value
   destination_cidr_block = "0.0.0.0/0"
   instance_id            = aws_instance.nat.id
