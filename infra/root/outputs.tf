@@ -30,9 +30,9 @@ output "frontend_private_ip" {
   description = "IP privada del servidor frontend"
 }
 
-output "backend_private_ip" {
-  value       = module.backend.private_ip
-  description = "IP privada del servidor backend"
+output "backend_private_ips" {
+  value       = module.backend.private_ips
+  description = "IPs privadas de los servidores backend"
 }
 
 # ------------------------------------------------------------------------------
@@ -51,7 +51,7 @@ output "ansible_connection_info" {
   value = {
     bastion_host  = module.bastion.public_ip
     frontend_host = module.frontend.private_ip
-    backend_host  = module.backend.private_ip
+    backend_hosts = module.backend.private_ips
     db_host       = module.rds.endpoint
     alb_dns       = module.alb.alb_dns_name
     ssh_user      = "ec2-user"
@@ -60,7 +60,10 @@ output "ansible_connection_info" {
     # Comandos SSH útiles
     ssh_to_bastion  = "ssh -i ~/.ssh/${var.ssh_key_name}.pem ec2-user@${module.bastion.public_ip}"
     ssh_to_frontend = "ssh -J ec2-user@${module.bastion.public_ip} ec2-user@${module.frontend.private_ip}"
-    ssh_to_backend  = "ssh -J ec2-user@${module.bastion.public_ip} ec2-user@${module.backend.private_ip}"
+    ssh_to_backend  = [
+      for ip in module.backend.private_ips :
+      "ssh -J ec2-user@${module.bastion.public_ip} ec2-user@${ip}"
+    ]
   }
   description = "Información de conexión para Ansible y SSH"
 }
@@ -91,7 +94,7 @@ output "next_steps" {
   
   3️⃣  Crear inventario de Ansible con estas IPs:
       Frontend: ${module.frontend.private_ip}
-      Backend:  ${module.backend.private_ip}
+      Backend:  ${join(", ", module.backend.private_ips)}
       RDS:      ${module.rds.endpoint}
   
   4️⃣  Ejecutar playbooks de deployment

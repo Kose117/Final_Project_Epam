@@ -120,7 +120,8 @@ module "backend" {
   source        = "../modules/ec2-backend"
   name_prefix   = local.name_prefix
   vpc_id        = module.vpc.vpc_id
-  subnet_id     = module.vpc.private_subnet_ids[1]
+  subnet_ids    = module.vpc.private_subnet_ids
+  instance_count = var.backend_instance_count
   instance_type = var.instance_type
   key_name      = var.ssh_key_name
   alb_sg_id     = module.alb.alb_sg_id
@@ -138,8 +139,9 @@ resource "aws_lb_target_group_attachment" "fe_attach" {
 }
 
 resource "aws_lb_target_group_attachment" "be_attach" {
+  for_each         = { for idx, id in module.backend.instance_ids : tostring(idx) => id }
   target_group_arn = module.alb.tg_backend_arn
-  target_id        = module.backend.instance_id
+  target_id        = each.value
   port             = 80
 }
 
@@ -168,7 +170,7 @@ module "monitoring" {
   region            = var.region
   alb_arn_suffix    = module.alb.alb_arn_suffix
   frontend_instance = module.frontend.instance_id
-  backend_instance  = module.backend.instance_id
+  backend_instances = module.backend.instance_ids
   rds_instance      = module.rds.db_instance_id
   tg_frontend_arn   = module.alb.tg_frontend_arn_suffix
   tg_backend_arn    = module.alb.tg_backend_arn_suffix

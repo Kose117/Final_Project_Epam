@@ -33,6 +33,7 @@ private_subnet_cidrs = ["10.10.11.0/24", "10.10.12.0/24"]
 # Compute - EC2 Instances
 # ------------------------------------------------------------------------------
 instance_type = "t3.micro"  # Free tier eligible
+backend_instance_count = 2
 
 # ⚠️ TODO: CAMBIAR POR TU KEY PAIR
 # Debe existir en AWS: EC2 → Key Pairs
