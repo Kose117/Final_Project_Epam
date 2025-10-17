@@ -49,25 +49,40 @@ locals {
 # VPC - Red virtual privada
 # ------------------------------------------------------------------------------
 module "vpc" {
-  source              = "../modules/vpc"
-  name_prefix         = local.name_prefix
-  cidr_block          = var.vpc_cidr
-  azs                 = var.azs
-  public_subnet_cidrs = var.public_subnet_cidrs
-  app_subnet_cidrs    = var.app_subnet_cidrs
-  db_subnet_cidrs     = var.db_subnet_cidrs
+  source                = "../modules/vpc"
+  name_prefix           = local.name_prefix
+  cidr_block            = var.vpc_cidr
+  azs                   = var.azs
+  public_subnet_cidrs   = var.public_subnet_cidrs
+  frontend_subnet_cidrs = var.frontend_subnet_cidrs
+  backend_subnet_cidrs  = var.backend_subnet_cidrs
+  db_subnet_cidrs       = var.db_subnet_cidrs
 }
 
 # ------------------------------------------------------------------------------
 # NAT INSTANCE - Salida a Internet para la capa de aplicación
 # ------------------------------------------------------------------------------
 module "nat" {
-  source               = "../modules/nat-instance"
+  source                  = "../modules/nat-instance"
+  name_prefix             = local.name_prefix
+  vpc_id                  = module.vpc.vpc_id
+  public_subnet_id        = module.vpc.public_subnet_ids[0]
+  private_route_table_ids = concat(module.vpc.frontend_route_table_ids, module.vpc.backend_route_table_ids)
+  private_subnet_cidrs    = concat(var.frontend_subnet_cidrs, var.backend_subnet_cidrs)
+  instance_type           = var.instance_type
+  key_name                = var.ssh_key_name
+  allowed_ssh_cidrs       = var.allowed_ssh_cidrs
+}
+
+# ------------------------------------------------------------------------------
+# BASTION - Jump server para acceso SSH
+# ------------------------------------------------------------------------------
+module "bastion" {
+  source               = "../modules/bastion"
   name_prefix          = local.name_prefix
   vpc_id               = module.vpc.vpc_id
   public_subnet_id     = module.vpc.public_subnet_ids[0]
-  app_route_table_ids  = module.vpc.app_route_table_ids
-  app_subnet_cidrs     = var.app_subnet_cidrs
+  private_subnet_cidrs = concat(var.frontend_subnet_cidrs, var.backend_subnet_cidrs)
   instance_type        = var.instance_type
   key_name             = var.ssh_key_name
   allowed_ssh_cidrs    = var.allowed_ssh_cidrs
@@ -90,13 +105,13 @@ module "bastion" {
 # ------------------------------------------------------------------------------
 # ALB - Application Load Balancer
 # ------------------------------------------------------------------------------
-module "alb" {
-  source               = "../modules/alb"
-  name_prefix          = local.name_prefix
-  vpc_id               = module.vpc.vpc_id
-  public_subnet_ids    = module.vpc.public_subnet_ids
-  frontend_health_path = "/"
-  backend_health_path  = "/api/health"
+module "alb_public" {
+  source                  = "../modules/alb"
+  name_prefix             = local.name_prefix
+  vpc_id                  = module.vpc.vpc_id
+  public_subnet_ids       = module.vpc.public_subnet_ids
+  frontend_health_path    = "/"
+  enable_backend_listener = false
 }
 
 # ------------------------------------------------------------------------------
@@ -106,12 +121,24 @@ module "frontend" {
   source        = "../modules/ec2-frontend"
   name_prefix   = local.name_prefix
   vpc_id        = module.vpc.vpc_id
-  subnet_id     = module.vpc.app_subnet_ids[0]
+  subnet_id     = module.vpc.frontend_subnet_ids[0]
   instance_type = var.instance_type
   key_name      = var.ssh_key_name
-  alb_sg_id     = module.alb.alb_sg_id
+  alb_sg_id     = module.alb_public.alb_sg_id
   bastion_sg_id = module.bastion.sg_id
   tags          = local.common_tags
+}
+
+# ------------------------------------------------------------------------------
+# INTERNAL ALB - Balanceador privado para el backend
+# ------------------------------------------------------------------------------
+module "alb_internal" {
+  source                = "../modules/alb-internal"
+  name_prefix           = local.name_prefix
+  vpc_id                = module.vpc.vpc_id
+  subnet_ids            = module.vpc.backend_subnet_ids
+  backend_health_path   = "/api/health"
+  allowed_client_sg_ids = [module.frontend.sg_id, module.bastion.sg_id]
 }
 
 # ------------------------------------------------------------------------------
@@ -121,11 +148,11 @@ module "backend" {
   source         = "../modules/ec2-backend"
   name_prefix    = local.name_prefix
   vpc_id         = module.vpc.vpc_id
-  subnet_ids     = module.vpc.app_subnet_ids
+  subnet_ids     = module.vpc.backend_subnet_ids
   instance_count = var.backend_instance_count
   instance_type  = var.instance_type
   key_name       = var.ssh_key_name
-  alb_sg_id      = module.alb.alb_sg_id
+  alb_sg_id      = module.alb_internal.alb_sg_id
   bastion_sg_id  = module.bastion.sg_id
   tags           = local.common_tags
 }
@@ -134,14 +161,14 @@ module "backend" {
 # TARGET GROUP ATTACHMENTS - Registra instancias en el ALB
 # ------------------------------------------------------------------------------
 resource "aws_lb_target_group_attachment" "fe_attach" {
-  target_group_arn = module.alb.tg_frontend_arn
+  target_group_arn = module.alb_public.tg_frontend_arn
   target_id        = module.frontend.instance_id
   port             = 80
 }
 
 resource "aws_lb_target_group_attachment" "be_attach" {
   for_each         = { for idx, id in module.backend.instance_ids : tostring(idx) => id }
-  target_group_arn = module.alb.tg_backend_arn
+  target_group_arn = module.alb_internal.tg_backend_arn
   target_id        = each.value
   port             = 80
 }
@@ -169,10 +196,11 @@ module "monitoring" {
   source            = "../modules/cloudwatch"
   name_prefix       = local.name_prefix
   region            = var.region
-  alb_arn_suffix    = module.alb.alb_arn_suffix
+  public_alb_arn_suffix  = module.alb_public.alb_arn_suffix
+  internal_alb_arn_suffix = module.alb_internal.alb_arn_suffix
   frontend_instance = module.frontend.instance_id
   backend_instances = module.backend.instance_ids
   rds_instance      = module.rds.db_instance_id
-  tg_frontend_arn   = module.alb.tg_frontend_arn_suffix
-  tg_backend_arn    = module.alb.tg_backend_arn_suffix
+  tg_frontend_arn_suffix = module.alb_public.tg_frontend_arn_suffix
+  tg_backend_arn_suffix  = module.alb_internal.tg_backend_arn_suffix
 }

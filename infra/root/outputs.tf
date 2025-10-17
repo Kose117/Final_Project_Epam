@@ -8,8 +8,13 @@
 # URLs y Endpoints Públicos
 # ------------------------------------------------------------------------------
 output "alb_dns_name" {
-  value       = module.alb.alb_dns_name
-  description = "URL del Application Load Balancer"
+  value       = module.alb_public.alb_dns_name
+  description = "URL del Application Load Balancer público"
+}
+
+output "internal_alb_dns_name" {
+  value       = module.alb_internal.alb_dns_name
+  description = "DNS interno del ALB que expone el backend"
 }
 
 output "bastion_ip" {
@@ -50,7 +55,8 @@ output "ansible_connection_info" {
     frontend_host = module.frontend.private_ip
     backend_host  = module.backend.private_ip
     db_host       = module.rds.endpoint
-    alb_dns       = module.alb.alb_dns_name
+    public_alb_dns  = module.alb_public.alb_dns_name
+    internal_alb_dns = module.alb_internal.alb_dns_name
     ssh_user      = "ec2-user"
     ssh_key_path  = "~/.ssh/${var.ssh_key_name}.pem"
     
@@ -74,7 +80,7 @@ output "next_steps" {
   
   📋 INFORMACIÓN CLAVE:
   
-  🌐 Aplicación:    http://${module.alb.alb_dns_name}
+  🌐 Frontend:      http://${module.alb_public.alb_dns_name}
   🖥️  Bastion SSH:   ssh -i ~/.ssh/${var.ssh_key_name}.pem ec2-user@${module.bastion.public_ip}
   💾 Base de Datos: ${module.rds.endpoint}
   📊 Monitoreo:     AWS Console → CloudWatch → Dashboards
@@ -94,8 +100,8 @@ output "next_steps" {
   4️⃣  Ejecutar playbooks de deployment
   
   5️⃣  Verificar aplicación:
-      curl http://${module.alb.alb_dns_name}/
-      curl http://${module.alb.alb_dns_name}/api/health
+      curl http://${module.alb_public.alb_dns_name}/
+      # Las rutas /api/* ahora están disponibles solo dentro de la VPC vía ${module.alb_internal.alb_dns_name}
   
   EOT
   description = "Instrucciones para los siguientes pasos"

@@ -63,8 +63,42 @@ resource "aws_cloudwatch_dashboard" "main" {
         type = "metric"
         properties = {
           metrics = [
-            ["AWS/ApplicationELB", "TargetResponseTime", { stat = "Average" }],
-            [".", "RequestCount", { stat = "Sum" }]
+            [
+              "AWS/ApplicationELB",
+              "TargetResponseTime",
+              "TargetGroup",
+              var.tg_frontend_arn_suffix,
+              "LoadBalancer",
+              var.public_alb_arn_suffix,
+              { stat = "Average", label = "Frontend TG - Latencia" }
+            ],
+            [
+              "AWS/ApplicationELB",
+              "TargetResponseTime",
+              "TargetGroup",
+              var.tg_backend_arn_suffix,
+              "LoadBalancer",
+              var.internal_alb_arn_suffix,
+              { stat = "Average", label = "Backend TG - Latencia" }
+            ],
+            [
+              "AWS/ApplicationELB",
+              "RequestCount",
+              "TargetGroup",
+              var.tg_frontend_arn_suffix,
+              "LoadBalancer",
+              var.public_alb_arn_suffix,
+              { stat = "Sum", label = "Frontend TG - Requests" }
+            ],
+            [
+              "AWS/ApplicationELB",
+              "RequestCount",
+              "TargetGroup",
+              var.tg_backend_arn_suffix,
+              "LoadBalancer",
+              var.internal_alb_arn_suffix,
+              { stat = "Sum", label = "Backend TG - Requests" }
+            ]
           ]
           period = 300
           region = var.region
@@ -151,8 +185,8 @@ resource "aws_cloudwatch_metric_alarm" "rds_cpu" {
 # ------------------------------------------------------------------------------
 # ALARM - ALB con muchos errores 5xx
 # ------------------------------------------------------------------------------
-resource "aws_cloudwatch_metric_alarm" "alb_5xx" {
-  alarm_name          = "${var.name_prefix}-alb-high-5xx"
+resource "aws_cloudwatch_metric_alarm" "alb_public_5xx" {
+  alarm_name          = "${var.name_prefix}-public-alb-high-5xx"
   comparison_operator = "GreaterThanThreshold"
   evaluation_periods  = 1
   metric_name         = "HTTPCode_Target_5XX_Count"
@@ -160,10 +194,27 @@ resource "aws_cloudwatch_metric_alarm" "alb_5xx" {
   period              = 300
   statistic           = "Sum"
   threshold           = 10  // Más de 10 errores 5xx en 5 minutos
-  alarm_description   = "ALB returning too many 5xx errors"
+  alarm_description   = "Public ALB returning too many 5xx errors"
   treat_missing_data  = "notBreaching"
 
   dimensions = {
-    LoadBalancer = var.alb_arn_suffix
+    LoadBalancer = var.public_alb_arn_suffix
+  }
+}
+
+resource "aws_cloudwatch_metric_alarm" "alb_internal_5xx" {
+  alarm_name          = "${var.name_prefix}-internal-alb-high-5xx"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 1
+  metric_name         = "HTTPCode_Target_5XX_Count"
+  namespace           = "AWS/ApplicationELB"
+  period              = 300
+  statistic           = "Sum"
+  threshold           = 10
+  alarm_description   = "Internal ALB returning too many 5xx errors"
+  treat_missing_data  = "notBreaching"
+
+  dimensions = {
+    LoadBalancer = var.internal_alb_arn_suffix
   }
 }
