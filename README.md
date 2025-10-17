@@ -148,7 +148,7 @@ Antes de aplicar la infraestructura desde WSL necesitas:
 1. **Cuenta AWS y usuario IAM con permisos de administrador** (o un rol que permita crear VPC, EC2, RDS, ALB, etc.).
 2. **AWS CLI v2** instalada y configurada (`aws configure`).
 3. **Terraform ≥ 1.9** instalado.
-4. **Key Pair de EC2** en la región `us-east-1` para poder conectarte por SSH.
+4. **Key Pair de EC2** en la región `us-east-1` para poder conectarte por SSH (Terraform puede generarlo automáticamente, ver Paso 2).
 5. **Tu IP pública** para restringir el acceso al bastion (`allowed_ssh_cidrs`).
 6. **Una contraseña segura para la base de datos** que exportarás como variable de entorno (`TF_VAR_db_password`).
 
@@ -156,40 +156,28 @@ Antes de aplicar la infraestructura desde WSL necesitas:
 
 ## Despliegue inicial
 
-### Paso 1: Crear bucket para el estado remoto de Terraform
-El bucket debe tener un nombre globalmente único. Sustituye `movie-analyst-tfstate-<tu-inicial>` por un nombre propio:
+### Paso 1: Crear el bucket del estado remoto con Terraform
+Usa el módulo `infra/state-bucket-init` para provisionar el bucket S3. Este módulo activa
+versionamiento, encriptado AES-256, bloqueo de acceso público y protege contra destrucción accidental.
+
+1. Personaliza el nombre globalmente único en `infra/state-bucket-init/terraform.tfvars` (`bucket_name`).
+2. Ejecuta:
 
 ```bash
-BUCKET_NAME="movie-analyst-tfstate-$(whoami)"
-
-# Comprueba que el nombre esté libre
-aws s3api head-bucket --bucket "$BUCKET_NAME" 2>&1 | grep -q 'Not Found'
-
-# Crea el bucket en us-east-1
-aws s3api create-bucket \
-  --bucket "$BUCKET_NAME" \
-  --region us-east-1 \
-  --create-bucket-configuration LocationConstraint=us-east-1
+cd infra/state-bucket-init
+terraform init
+terraform plan
+terraform apply
 ```
 
-Actualiza `infra/backend-config/backend.hcl` con el nombre real del bucket (`bucket = "..."`).
+Al finalizar, copia los valores sugeridos en el output `backend_config_instructions` a `infra/backend-config/backend.hcl`.
 
-### Paso 2: Crear (o importar) un Key Pair de EC2
-Puedes crearlo desde la consola (EC2 → Network & Security → Key Pairs → Create key pair) o desde la CLI:
+### Paso 2: Generar el Key Pair de EC2 desde Terraform
+Por defecto, el módulo raíz genera automáticamente un par de llaves RSA (4 096 bits), registra la clave pública en AWS y guarda la privada en `~/.ssh/<key_name>.pem`.
 
-```bash
-KEY_NAME="movie-analyst-wsl"
-
-aws ec2 create-key-pair \
-  --key-name "$KEY_NAME" \
-  --key-type rsa \
-  --query 'KeyMaterial' \
-  --output text > "$HOME/.ssh/${KEY_NAME}.pem"
-
-chmod 400 "$HOME/.ssh/${KEY_NAME}.pem"
-```
-
-Toma nota del nombre (`movie-analyst-wsl` en el ejemplo) porque lo usarás en `ssh_key_name`.
+- Define el nombre deseado en `ssh_key_name` dentro de tu archivo `*.tfvars`.
+- Asegúrate de dejar `generate_ssh_key = true` para que Terraform cree el key pair en la primera ejecución.
+- Si ya cuentas con un key pair existente, pon `generate_ssh_key = false` y opcionalmente indica la ruta local con `ssh_private_key_path`.
 
 ### Paso 3: Obtener tu IP pública para `allowed_ssh_cidrs`
 Desde WSL ejecuta:
@@ -206,6 +194,7 @@ En lugar de generar una contraseña aleatoria, define directamente una contrase�
 
 ```bash
 export TF_VAR_db_password="Josemanuel2003*"
+```
 
 ### Paso 5: Copiar el template de variables y personalizarlo
 
@@ -216,7 +205,7 @@ cp terraform.tfvars ../environments/qa.tfvars   # o prod.tfvars según el entorn
 
 Edita el archivo `infra/environments/qa.tfvars` (o `prod.tfvars`) y reemplaza:
 
-- `ssh_key_name` por el nombre exacto del Key Pair creado en el Paso 2.
+- `ssh_key_name` por el nombre que deseas utilizar en AWS (Terraform lo creará si `generate_ssh_key = true`).
 - `allowed_ssh_cidrs` por tu IP en formato `/32` obtenida en el Paso 3.
 - Ajusta `backend_instance_count`, `instance_type` y los CIDR si necesitas otra topología.
 

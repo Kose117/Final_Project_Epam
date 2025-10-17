@@ -8,6 +8,10 @@ resource "aws_s3_bucket" "tf_state" {
   bucket        = var.bucket_name
   force_destroy = false  // Protección: no destruir el bucket si contiene objetos
 
+  lifecycle {
+    prevent_destroy = true  // Evita que terraform destroy elimine el bucket por accidente
+  }
+
   tags = merge(var.tags, { Name = var.bucket_name })
 }
 
@@ -44,6 +48,34 @@ resource "aws_s3_bucket_public_access_block" "this" {
   block_public_policy     = true  // Bloquea nuevas políticas públicas
   ignore_public_acls      = true  // Ignora ACLs públicas existentes
   restrict_public_buckets = true  // Restringe acceso público
+}
+
+# ------------------------------------------------------------------------------
+# VERSIONING - Historial de objetos del tfstate
+# ------------------------------------------------------------------------------
+# Activa versionamiento para poder recuperar estados anteriores ante un error.
+# ------------------------------------------------------------------------------
+resource "aws_s3_bucket_versioning" "this" {
+  bucket = aws_s3_bucket.tf_state.id
+
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+# ------------------------------------------------------------------------------
+# DEFAULT ENCRYPTION - Encriptado en reposo obligatorio
+# ------------------------------------------------------------------------------
+# Garantiza que todo objeto se guarde con SSE-S3 (AES256) para proteger el state.
+# ------------------------------------------------------------------------------
+resource "aws_s3_bucket_server_side_encryption_configuration" "this" {
+  bucket = aws_s3_bucket.tf_state.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
+  }
 }
 
 data "aws_iam_policy_document" "deny_insecure_transport" {

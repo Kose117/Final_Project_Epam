@@ -4,15 +4,21 @@ output "backend_config_instructions" {
     ╔════════════════════════════════════════════════════════════════════════╗
     ║  ✅ BUCKET CREADO EXITOSAMENTE                                         ║
     ╚════════════════════════════════════════════════════════════════════════╝
-    
+
     Copia esta configuración a backend-config/backend.hcl:
-    
+
     bucket               = "${aws_s3_bucket.tf_state.bucket}"
     key                  = "root/terraform.tfstate"
     region               = "${aws_s3_bucket.tf_state.region}"
     use_lockfile         = true
     workspace_key_prefix = "env"
-    
+
+    Características habilitadas automáticamente:
+      - Versioning para recuperar estados previos
+      - Encriptado SSE-S3 (AES256)
+      - Bloqueo completo de acceso público
+      - Protección contra terraform destroy accidental
+
     Luego inicializa tu proyecto con:
     
     cd env/qa  # o env/prod

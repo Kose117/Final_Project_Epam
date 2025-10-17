@@ -25,6 +25,8 @@ db_subnet_cidrs       = ["10.10.21.0/24", "10.10.22.0/24"]
 # Compute
 instance_type     = "t3.micro"
 ssh_key_name      = "movie-analyst-wsl"      # Ajusta con el nombre creado en Paso 2
+# generate_ssh_key  = true                     # Opcional: desactiva si deseas reutilizar un key pair existente
+# ssh_private_key_path = "~/.ssh/movie-analyst-wsl.pem"  # Opcional: ruta personalizada para guardar el .pem
 allowed_ssh_cidrs = ["203.0.113.25/32"]      # Reemplaza con tu IP pública /32 (Paso 3)
 
 # Database

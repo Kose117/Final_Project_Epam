@@ -37,9 +37,15 @@ db_subnet_cidrs       = ["10.10.21.0/24", "10.10.22.0/24"]
 instance_type = "t3.micro"  # Free tier eligible
 backend_instance_count = 2
 
-# Nombre EXACTO del key pair creado en el Paso 2 del README
-# Ejemplo tras ejecutar aws ec2 create-key-pair --key-name movie-analyst-wsl
+# Nombre del key pair. Terraform lo generará automáticamente si generate_ssh_key = true
 ssh_key_name = "movie-analyst-wsl"
+
+# Deja generate_ssh_key = true para crear la llave desde Terraform la primera vez.
+# Ponlo en false solo si quieres reutilizar un key pair ya existente en AWS.
+generate_ssh_key = true
+
+# Opcional: personaliza la ruta local del archivo PEM.
+# ssh_private_key_path = "~/.ssh/movie-analyst-wsl.pem"
 
 # Lista de CIDRs permitidos para SSH al bastion.
 # Obtén tu IP con: curl ifconfig.me  → convierte a formato /32 (Paso 3 del README)
