@@ -63,15 +63,15 @@ module "vpc" {
 # NAT INSTANCE - Salida a Internet para la capa de aplicación
 # ------------------------------------------------------------------------------
 module "nat" {
-  source                  = "../modules/nat-instance"
-  name_prefix             = local.name_prefix
-  vpc_id                  = module.vpc.vpc_id
-  public_subnet_id        = module.vpc.public_subnet_ids[0]
-  private_route_table_ids = concat(module.vpc.frontend_route_table_ids, module.vpc.backend_route_table_ids)
-  private_subnet_cidrs    = concat(var.frontend_subnet_cidrs, var.backend_subnet_cidrs)
-  instance_type           = var.instance_type
-  key_name                = var.ssh_key_name
-  allowed_ssh_cidrs       = var.allowed_ssh_cidrs
+  source              = "../modules/nat-instance"
+  name_prefix         = local.name_prefix
+  vpc_id              = module.vpc.vpc_id
+  public_subnet_id    = module.vpc.public_subnet_ids[0]
+  app_route_table_ids = concat(module.vpc.frontend_route_table_ids, module.vpc.backend_route_table_ids)
+  app_subnet_cidrs    = concat(var.frontend_subnet_cidrs, var.backend_subnet_cidrs)
+  instance_type       = var.instance_type
+  key_name            = var.ssh_key_name
+  allowed_ssh_cidrs   = var.allowed_ssh_cidrs
 }
 
 # ------------------------------------------------------------------------------
@@ -82,7 +82,7 @@ module "bastion" {
   name_prefix          = local.name_prefix
   vpc_id               = module.vpc.vpc_id
   public_subnet_id     = module.vpc.public_subnet_ids[0]
-  private_subnet_cidrs = concat(var.frontend_subnet_cidrs, var.backend_subnet_cidrs)
+  app_subnet_cidrs     = concat(var.frontend_subnet_cidrs, var.backend_subnet_cidrs)
   instance_type        = var.instance_type
   key_name             = var.ssh_key_name
   allowed_ssh_cidrs    = var.allowed_ssh_cidrs
