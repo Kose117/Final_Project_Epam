@@ -1,7 +1,9 @@
 # ==============================================================================
-# ROOT MODULE - Infraestructura Unificada QA/Prod
+# ROOT MODULE - Infraestructura Unificada
 # ==============================================================================
-# Módulo raíz único que se parametriza con variables.
+# Módulo raíz único parametrizado con variables.
+# Reemplaza los antiguos env/qa/main.tf y env/prod/main.tf
+# 
 # Uso:
 #   terraform workspace select qa
 #   terraform apply -var-file=../environments/qa.tfvars
@@ -18,6 +20,7 @@ terraform {
 provider "aws" {
   region = var.region
   
+  # Tags aplicados automáticamente a TODOS los recursos
   default_tags {
     tags = {
       Project     = var.project_name
@@ -29,6 +32,9 @@ provider "aws" {
   }
 }
 
+# ------------------------------------------------------------------------------
+# LOCALS - Variables derivadas
+# ------------------------------------------------------------------------------
 locals {
   name_prefix = "${var.project_name}-${var.environment}"
   
@@ -67,7 +73,7 @@ module "nat" {
 }
 
 # ------------------------------------------------------------------------------
-# BASTION - Jump server con Ansible pre-configurado
+# BASTION - Jump server para acceso SSH
 # ------------------------------------------------------------------------------
 module "bastion" {
   source               = "../modules/bastion"
@@ -78,10 +84,6 @@ module "bastion" {
   instance_type        = var.instance_type
   key_name             = var.ssh_key_name
   allowed_ssh_cidrs    = var.allowed_ssh_cidrs
-  
-  # Nueva variable para auto-configuración
-  enable_ansible_setup = true
-  ssh_private_key_content = var.ssh_private_key_content  # Opcional
 }
 
 # ------------------------------------------------------------------------------
@@ -112,20 +114,18 @@ module "frontend" {
 }
 
 # ------------------------------------------------------------------------------
-# EC2 BACKEND - Múltiples instancias para HA
+# EC2 BACKEND - Servidor de aplicación en subnet privada
 # ------------------------------------------------------------------------------
 module "backend" {
-  source = "../modules/ec2-backend"
-  
-  name_prefix       = local.name_prefix
-  vpc_id            = module.vpc.vpc_id
-  instance_count    = var.backend_instance_count  # 2 para HA
-  subnet_ids        = module.vpc.private_subnet_ids  # Distribuye en múltiples AZs
-  instance_type     = var.instance_type
-  key_name          = var.ssh_key_name
-  alb_sg_id         = module.alb.alb_sg_id
-  bastion_sg_id     = module.bastion.sg_id
-  tags              = local.common_tags
+  source        = "../modules/ec2-backend"
+  name_prefix   = local.name_prefix
+  vpc_id        = module.vpc.vpc_id
+  subnet_id     = module.vpc.private_subnet_ids[1]
+  instance_type = var.instance_type
+  key_name      = var.ssh_key_name
+  alb_sg_id     = module.alb.alb_sg_id
+  bastion_sg_id = module.bastion.sg_id
+  tags          = local.common_tags
 }
 
 # ------------------------------------------------------------------------------
@@ -137,11 +137,9 @@ resource "aws_lb_target_group_attachment" "fe_attach" {
   port             = 80
 }
 
-# Attachments dinámicos para múltiples backends
 resource "aws_lb_target_group_attachment" "be_attach" {
-  count            = var.backend_instance_count
   target_group_arn = module.alb.tg_backend_arn
-  target_id        = module.backend.instance_ids[count.index]
+  target_id        = module.backend.instance_id
   port             = 80
 }
 
@@ -165,13 +163,13 @@ module "rds" {
 # CLOUDWATCH - Monitoreo y alarmas
 # ------------------------------------------------------------------------------
 module "monitoring" {
-  source             = "../modules/cloudwatch"
-  name_prefix        = local.name_prefix
-  region             = var.region
-  alb_arn_suffix     = module.alb.alb_arn_suffix
-  frontend_instance  = module.frontend.instance_id
-  backend_instances  = module.backend.instance_ids  # Lista de IDs
-  rds_instance       = module.rds.db_instance_id
-  tg_frontend_arn    = module.alb.tg_frontend_arn_suffix
-  tg_backend_arn     = module.alb.tg_backend_arn_suffix
+  source            = "../modules/cloudwatch"
+  name_prefix       = local.name_prefix
+  region            = var.region
+  alb_arn_suffix    = module.alb.alb_arn_suffix
+  frontend_instance = module.frontend.instance_id
+  backend_instance  = module.backend.instance_id
+  rds_instance      = module.rds.db_instance_id
+  tg_frontend_arn   = module.alb.tg_frontend_arn_suffix
+  tg_backend_arn    = module.alb.tg_backend_arn_suffix
 }

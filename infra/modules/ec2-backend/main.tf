@@ -1,8 +1,8 @@
 # ==============================================================================
-# EC2 BACKEND MODULE - Servidor de aplicación (Node.js/Express)
+# EC2 BACKEND MODULE - Múltiples Instancias para Alta Disponibilidad
 # ==============================================================================
-# Instancia en subnet privada que sirve el backend API de la aplicación.
-# Solo acepta tráfico HTTP desde el ALB y SSH desde el Bastion.
+# Crea N instancias de backend distribuidas en diferentes subnets/AZs.
+# El ALB distribuye la carga entre todas las instancias.
 # ==============================================================================
 
 # ------------------------------------------------------------------------------
@@ -23,7 +23,7 @@ data "aws_ami" "al2023" {
 }
 
 # ------------------------------------------------------------------------------
-# SECURITY GROUP - Reglas de firewall
+# SECURITY GROUP - Compartido por todas las instancias backend
 # ------------------------------------------------------------------------------
 resource "aws_security_group" "app" {
   name   = "${var.name_prefix}-be-sg"
@@ -62,31 +62,43 @@ resource "aws_security_group" "app" {
 }
 
 # ------------------------------------------------------------------------------
-# BACKEND INSTANCE
+# BACKEND INSTANCES - Múltiples instancias distribuidas
 # ------------------------------------------------------------------------------
 resource "aws_instance" "be" {
+  count = var.instance_count
+  
   ami                         = data.aws_ami.al2023.id
   instance_type               = var.instance_type
-  subnet_id                   = var.subnet_id
+  
+  # Distribuye instancias en diferentes subnets (diferentes AZs)
+  subnet_id                   = var.subnet_ids[count.index % length(var.subnet_ids)]
+  
   vpc_security_group_ids      = [aws_security_group.app.id]
   key_name                    = var.key_name
   associate_public_ip_address = false
 
-  # Placeholder: servidor HTTP mínimo en Python
-  # Ansible instalará Node.js y la aplicación real posteriormente
+  # User data básico - Ansible configurará la aplicación real
   user_data = <<-EOF
     #!/bin/bash
     set -eux
     dnf update -y
     dnf install -y python3
+    
+    # Servidor HTTP placeholder (Ansible instalará Node.js después)
     cat >/usr/local/bin/app.py <<PY
 from http.server import BaseHTTPRequestHandler, HTTPServer
+import socket
 class H(BaseHTTPRequestHandler):
   def do_GET(self):
+    hostname = socket.gethostname()
     if self.path.startswith('/api'):
-      self.send_response(200); self.end_headers(); self.wfile.write(b'Backend OK')
+      self.send_response(200)
+      self.send_header('Content-type', 'text/plain')
+      self.end_headers()
+      self.wfile.write(f'Backend OK from {hostname}\n'.encode())
     else:
-      self.send_response(404); self.end_headers()
+      self.send_response(404)
+      self.end_headers()
 HTTPServer(('', 80), H).serve_forever()
 PY
     chmod +x /usr/local/bin/app.py
@@ -95,6 +107,10 @@ PY
 
   tags = merge(
     var.tags,
-    { Name = "${var.name_prefix}-be" }
+    { 
+      Name = "${var.name_prefix}-be-${count.index + 1}"
+      Role = "backend"
+      Instance = "${count.index + 1}"
+    }
   )
 }
