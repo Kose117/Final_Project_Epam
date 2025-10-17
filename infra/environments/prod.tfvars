@@ -37,12 +37,11 @@ db_subnet_cidrs       = ["10.20.21.0/24", "10.20.22.0/24"]
 instance_type = "t3.micro"  # Considerar t3.small o t3.medium para producción real
 backend_instance_count = 2
 
-# ⚠️ TODO: CAMBIAR POR TU KEY PAIR
-ssh_key_name = "devops-keypair"
+# Nombre del key pair corporativo (ver Paso 2 del README)
+ssh_key_name = "movie-analyst-prod"
 
-# ⚠️ TODO: CAMBIAR POR IP DE OFICINA O VPN
-# Para producción, restringir acceso SSH a IPs conocidas
-allowed_ssh_cidrs = ["0.0.0.0/0"]  # ⚠️ CAMBIAR: Muy inseguro para producción
+# Restringe el acceso SSH a la IP de tu oficina/VPN en formato /32 (Paso 3 del README)
+allowed_ssh_cidrs = ["198.51.100.42/32"]
 
 # ------------------------------------------------------------------------------
 # Database - RDS MySQL
@@ -50,9 +49,8 @@ allowed_ssh_cidrs = ["0.0.0.0/0"]  # ⚠️ CAMBIAR: Muy inseguro para producci�
 db_name     = "appdb"
 db_username = "appuser"
 
-# ⚠️ TODO: USAR VARIABLE DE ENTORNO EN PRODUCCIÓN
-# NUNCA commitear passwords de producción a Git
-# Usar: export TF_VAR_db_password="PasswordSuperSeguro-Prod-2024!"
+# Exporta la contraseña con: export TF_VAR_db_password="$(openssl rand -base64 30)"
+# Evita guardar contraseñas reales en Git; sustituye este valor antes de aplicar.
 db_password = "ChangeMe-PROD-Pass123!"
 
 db_instance_class    = "db.t3.micro"  # Considerar db.t3.small para producción real

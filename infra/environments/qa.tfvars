@@ -37,14 +37,14 @@ db_subnet_cidrs       = ["10.10.21.0/24", "10.10.22.0/24"]
 instance_type = "t3.micro"  # Free tier eligible
 backend_instance_count = 2
 
-# ⚠️ TODO: CAMBIAR POR TU KEY PAIR
-# Debe existir en AWS: EC2 → Key Pairs
-ssh_key_name = "devops-keypair"
+# Nombre EXACTO del key pair creado en el Paso 2 del README
+# Ejemplo tras ejecutar aws ec2 create-key-pair --key-name movie-analyst-wsl
+ssh_key_name = "movie-analyst-wsl"
 
-# ⚠️ TODO: CAMBIAR POR TU IP PÚBLICA
-# Obtener con: curl ifconfig.me
-# Formato: ["123.45.67.89/32"]
-allowed_ssh_cidrs = ["0.0.0.0/0"]  # ⚠️ CAMBIAR: Permite SSH desde cualquier IP (inseguro, solo para testing)
+# Lista de CIDRs permitidos para SSH al bastion.
+# Obtén tu IP con: curl ifconfig.me  → convierte a formato /32 (Paso 3 del README)
+# Usa direcciones documentales (203.0.113.0/24) como ejemplo únicamente.
+allowed_ssh_cidrs = ["203.0.113.25/32"]
 
 # ------------------------------------------------------------------------------
 # Database - RDS MySQL
@@ -52,10 +52,9 @@ allowed_ssh_cidrs = ["0.0.0.0/0"]  # ⚠️ CAMBIAR: Permite SSH desde cualquier
 db_name     = "appdb"
 db_username = "appuser"
 
-# ⚠️ TODO: CAMBIAR POR PASSWORD SEGURO
-# IMPORTANTE: NO commitear passwords reales a Git
-# Mejor práctica: usar variable de entorno
-#   export TF_VAR_db_password="MiPasswordSeguro123!"
+# Password del usuario master (Paso 4 del README).
+# Genera el valor con: export TF_VAR_db_password="$(openssl rand -base64 24)"
+# Reemplaza esta cadena sólo si decides guardarlo temporalmente en el tfvars.
 db_password = "ChangeMe-QA-Pass123!"
 
 db_instance_class    = "db.t3.micro"  # Free tier eligible

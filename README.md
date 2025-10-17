@@ -142,18 +142,97 @@ flowchart LR
 - Parches automáticos
 - Mejor práctica AWS Well-Architected
 
-## Prerequisitos
-1. **AWS CLI** configurado con credenciales
-2. **Terraform** >= 1.9.0
-3. **SSH Key** creada en AWS (región us-east-1)
-4. **Tu IP pública** para acceso SSH
+## Prerrequisitos
+Antes de aplicar la infraestructura desde WSL necesitas:
+
+1. **Cuenta AWS y usuario IAM con permisos de administrador** (o un rol que permita crear VPC, EC2, RDS, ALB, etc.).
+2. **AWS CLI v2** instalada y configurada (`aws configure`).
+3. **Terraform ≥ 1.9** instalado.
+4. **Key Pair de EC2** en la región `us-east-1` para poder conectarte por SSH.
+5. **Tu IP pública** para restringir el acceso al bastion (`allowed_ssh_cidrs`).
+6. **Una contraseña segura para la base de datos** que exportarás como variable de entorno (`TF_VAR_db_password`).
+
+> Si necesitas instalar Terraform o AWS CLI en WSL, sigue las instrucciones del intercambio anterior o consulta la documentación oficial de HashiCorp/AWS.
 
 ## Despliegue inicial
 
-### Paso 1: Crear bucket para Terraform state
+### Paso 1: Crear bucket para el estado remoto de Terraform
+El bucket debe tener un nombre globalmente único. Sustituye `movie-analyst-tfstate-<tu-inicial>` por un nombre propio:
+
 ```bash
+BUCKET_NAME="movie-analyst-tfstate-$(whoami)"
+
+# Comprueba que el nombre esté libre
+aws s3api head-bucket --bucket "$BUCKET_NAME" 2>&1 | grep -q 'Not Found'
+
+# Crea el bucket en us-east-1
 aws s3api create-bucket \
-  --bucket <tf-state-bucket> \
-  --region us-east-1
+  --bucket "$BUCKET_NAME" \
+  --region us-east-1 \
+  --create-bucket-configuration LocationConstraint=us-east-1
 ```
+
+Actualiza `infra/backend-config/backend.hcl` con el nombre real del bucket (`bucket = "..."`).
+
+### Paso 2: Crear (o importar) un Key Pair de EC2
+Puedes crearlo desde la consola (EC2 → Network & Security → Key Pairs → Create key pair) o desde la CLI:
+
+```bash
+KEY_NAME="movie-analyst-wsl"
+
+aws ec2 create-key-pair \
+  --key-name "$KEY_NAME" \
+  --key-type rsa \
+  --query 'KeyMaterial' \
+  --output text > "$HOME/.ssh/${KEY_NAME}.pem"
+
+chmod 400 "$HOME/.ssh/${KEY_NAME}.pem"
+```
+
+Toma nota del nombre (`movie-analyst-wsl` en el ejemplo) porque lo usarás en `ssh_key_name`.
+
+### Paso 3: Obtener tu IP pública para `allowed_ssh_cidrs`
+Desde WSL ejecuta:
+
+```bash
+curl ifconfig.me
+```
+
+Si la salida es `203.0.113.25`, la notación CIDR sería `203.0.113.25/32`. Usa esta cadena en la variable `allowed_ssh_cidrs` para limitar el acceso SSH al bastion.
+
+### Paso 4: Generar la contraseña de la base de datos y exportarla
+Genera una contraseña robusta y expórtala como variable de entorno antes de ejecutar Terraform:
+
+```bash
+export TF_VAR_db_password="$(openssl rand -base64 24)"
+```
+
+Si prefieres una contraseña concreta, reemplaza el comando por tu propio valor fuerte (al menos 12 caracteres con mayúsculas, minúsculas, números y símbolos).
+
+### Paso 5: Copiar el template de variables y personalizarlo
+
+```bash
+cd /ruta/al/repositorio/infra/root
+cp terraform.tfvars ../environments/qa.tfvars   # o prod.tfvars según el entorno
+```
+
+Edita el archivo `infra/environments/qa.tfvars` (o `prod.tfvars`) y reemplaza:
+
+- `ssh_key_name` por el nombre exacto del Key Pair creado en el Paso 2.
+- `allowed_ssh_cidrs` por tu IP en formato `/32` obtenida en el Paso 3.
+- Ajusta `backend_instance_count`, `instance_type` y los CIDR si necesitas otra topología.
+
+> Si prefieres no guardar la contraseña en el `.tfvars`, elimina la línea `db_password = ...` del archivo y confía únicamente en `export TF_VAR_db_password=...`.
+
+### Paso 6: Inicializar y aplicar Terraform
+```
+terraform init -backend-config=../backend-config/backend.hcl
+terraform workspace new qa   # solo la primera vez
+terraform workspace select qa
+terraform plan  -var-file=../environments/qa.tfvars
+terraform apply -var-file=../environments/qa.tfvars
+```
+
+### Paso 7: Configurar el frontend con el ALB interno del backend
+Después del `terraform apply`, obtén `internal_alb_dns_name` del output. Ese valor debe inyectarse como `BACKEND_ORIGIN` en el servicio Node.js (por ejemplo `http://internal-alb-1234.us-east-1.elb.amazonaws.com`). Puedes hacerlo vía variable de entorno, archivo `.env` o mediante `user_data` en la instancia frontend.
 

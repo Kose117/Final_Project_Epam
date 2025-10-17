@@ -24,12 +24,12 @@ db_subnet_cidrs       = ["10.10.21.0/24", "10.10.22.0/24"]
 
 # Compute
 instance_type     = "t3.micro"
-ssh_key_name      = "TU-KEYPAIR-AQUI"        # ⚠️ CAMBIAR
-allowed_ssh_cidrs = ["123.45.67.89/32"]      # ⚠️ CAMBIAR por tu IP
+ssh_key_name      = "movie-analyst-wsl"      # Ajusta con el nombre creado en Paso 2
+allowed_ssh_cidrs = ["203.0.113.25/32"]      # Reemplaza con tu IP pública /32 (Paso 3)
 
 # Database
 db_name              = "appdb"
 db_username          = "appuser"
-db_password          = "CAMBIAR-PASSWORD"     # ⚠️ CAMBIAR
+db_password          = "ChangeMe-Password123!"  # Genera uno nuevo con Paso 4 (reemplaza)
 db_instance_class    = "db.t3.micro"
 db_allocated_storage = 20

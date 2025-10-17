@@ -51,14 +51,14 @@ output "rds_endpoint" {
 # ------------------------------------------------------------------------------
 output "ansible_connection_info" {
   value = {
-    bastion_host   = module.bastion.public_ip
-    frontend_host  = module.frontend.private_ip
-    backend_hosts  = module.backend.private_ips  # ✅ PLURAL
-    db_host        = module.rds.endpoint
-    public_alb_dns = module.alb_public.alb_dns_name
+    bastion_host  = module.bastion.public_ip
+    frontend_host = module.frontend.private_ip
+    backend_hosts = module.backend.private_ips
+    db_host       = module.rds.endpoint
+    public_alb_dns  = module.alb_public.alb_dns_name
     internal_alb_dns = module.alb_internal.alb_dns_name
-    ssh_user       = "ec2-user"
-    ssh_key_path   = "~/.ssh/${var.ssh_key_name}.pem"
+    ssh_user      = "ec2-user"
+    ssh_key_path  = "~/.ssh/${var.ssh_key_name}.pem"
     
     # Comandos SSH útiles
     ssh_to_bastion  = "ssh -i ~/.ssh/${var.ssh_key_name}.pem ec2-user@${module.bastion.public_ip}"

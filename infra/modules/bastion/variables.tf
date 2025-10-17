@@ -1,13 +1,7 @@
-# infra/modules/bastion/variables.tf - CORREGIR:
 variable "name_prefix"        { type = string }
 variable "vpc_id"             { type = string }
 variable "public_subnet_id"   { type = string }
-
-# ✅ CAMBIAR ESTE NOMBRE:
-variable "app_subnet_cidrs" {  # antes: private_subnet_cidrs
-  type        = list(string)
-  description = "CIDRs de subnets de aplicación para SSH egress"
-}
+variable "private_subnet_cidrs" { type = list(string) }
 
 variable "instance_type" {
   type    = string
