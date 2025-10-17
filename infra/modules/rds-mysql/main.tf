@@ -12,7 +12,7 @@
 # ------------------------------------------------------------------------------
 resource "aws_db_subnet_group" "this" {
   name       = "${var.name_prefix}-rds-subnetgrp"
-  subnet_ids = var.private_subnet_ids
+  subnet_ids = var.db_subnet_ids
   tags       = { Name = "${var.name_prefix}-rds-subnetgrp" }
 }
 

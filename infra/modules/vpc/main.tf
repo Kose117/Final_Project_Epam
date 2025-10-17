@@ -40,19 +40,35 @@ resource "aws_subnet" "public" {
 }
 
 # ------------------------------------------------------------------------------
-# PRIVATE SUBNETS - Subredes privadas
+# APP SUBNETS - Capa de aplicación
 # ------------------------------------------------------------------------------
-# Instancias aquí NO tienen acceso directo a Internet (Frontend, Backend, RDS).
+# Instancias aquí NO tienen acceso directo a Internet (Frontend, Backend).
 # ------------------------------------------------------------------------------
-resource "aws_subnet" "private" {
-  for_each = { for idx, cidr in var.private_subnet_cidrs : idx => cidr }
-  
+resource "aws_subnet" "app" {
+  for_each = { for idx, cidr in var.app_subnet_cidrs : idx => cidr }
+
   vpc_id                  = aws_vpc.this.id
   cidr_block              = each.value
   availability_zone       = var.azs[tonumber(each.key)]
   map_public_ip_on_launch = false
-  
-  tags = { Name = "${var.name_prefix}-private-${each.key}" }
+
+  tags = { Name = "${var.name_prefix}-app-${each.key}" }
+}
+
+# ------------------------------------------------------------------------------
+# DB SUBNETS - Capa de datos
+# ------------------------------------------------------------------------------
+# Subredes aisladas utilizadas exclusivamente por RDS.
+# ------------------------------------------------------------------------------
+resource "aws_subnet" "db" {
+  for_each = { for idx, cidr in var.db_subnet_cidrs : idx => cidr }
+
+  vpc_id                  = aws_vpc.this.id
+  cidr_block              = each.value
+  availability_zone       = var.azs[tonumber(each.key)]
+  map_public_ip_on_launch = false
+
+  tags = { Name = "${var.name_prefix}-db-${each.key}" }
 }
 
 # ------------------------------------------------------------------------------
@@ -78,19 +94,36 @@ resource "aws_route_table_association" "public_assoc" {
 }
 
 # ------------------------------------------------------------------------------
-# PRIVATE ROUTE TABLES - Tablas de rutas privadas
+# APP ROUTE TABLES - Tablas de rutas para la capa de aplicación
 # ------------------------------------------------------------------------------
-# Una por subnet privada. La ruta a Internet (0.0.0.0/0 -> NAT instance)
+# Una por subnet privada de aplicación. La ruta a Internet (0.0.0.0/0 -> NAT instance)
 # se agrega desde el módulo nat-instance.
 # ------------------------------------------------------------------------------
-resource "aws_route_table" "private" {
-  for_each = aws_subnet.private
+resource "aws_route_table" "app" {
+  for_each = aws_subnet.app
   vpc_id   = aws_vpc.this.id
-  tags     = { Name = "${var.name_prefix}-private-rt-${each.key}" }
+  tags     = { Name = "${var.name_prefix}-app-rt-${each.key}" }
 }
 
-resource "aws_route_table_association" "private_assoc" {
-  for_each       = aws_subnet.private
+resource "aws_route_table_association" "app_assoc" {
+  for_each       = aws_subnet.app
   subnet_id      = each.value.id
-  route_table_id = aws_route_table.private[each.key].id
+  route_table_id = aws_route_table.app[each.key].id
+}
+
+# ------------------------------------------------------------------------------
+# DB ROUTE TABLES - Tablas de rutas para la capa de datos
+# ------------------------------------------------------------------------------
+# Sin ruta por defecto a Internet; solo la ruta local.
+# ------------------------------------------------------------------------------
+resource "aws_route_table" "db" {
+  for_each = aws_subnet.db
+  vpc_id   = aws_vpc.this.id
+  tags     = { Name = "${var.name_prefix}-db-rt-${each.key}" }
+}
+
+resource "aws_route_table_association" "db_assoc" {
+  for_each       = aws_subnet.db
+  subnet_id      = each.value.id
+  route_table_id = aws_route_table.db[each.key].id
 }
