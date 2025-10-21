@@ -1,0 +1,69 @@
+- backend-config
+  - backend.hcl
+- environments
+  - prod.tfvars
+  - qa.tfvars
+- modules
+  - alb
+    - main.tf
+    - outputs.tf
+    - variables.tf
+  - alb-internal
+    - main.tf
+    - outputs.tf
+    - variables.tf
+  - bastion
+    - main.tf
+    - outputs.tf
+    - variables.tf
+  - cloudwatch
+    - main.tf
+    - outputs.tf
+    - variables.tf
+  - ec2-backend
+    - main.tf
+    - outputs.tf
+    - variables.tf
+  - ec2-frontend
+    - main.tf
+    - outputs.tf
+    - variables.tf
+  - nat-gateway
+    - main.tf
+    - outputs.tf
+    - variables.tf
+  - rds-mysql
+    - main.tf
+    - outputs.tf
+    - variables.tf
+  - ssh-key
+    - main.tf
+    - outputs.tf
+    - variables.tf
+  - vpc
+    - main.tf
+    - outputs.tf
+    - variables.tf
+- project_structure.text
+- root
+  - main.tf
+  - outputs.tf
+  - terraform.tfvars
+  - variables.tf
+- state-bucket-init
+  - .terraform
+    - providers
+      - registry.terraform.io
+        - hashicorp
+          - aws
+            - 5.100.0
+              - linux_amd64
+                - LICENSE.txt
+                - terraform-provider-aws_v5.100.0_x5
+  - .terraform.lock.hcl
+  - main.tf
+  - outputs.tf
+  - plan.tfplan
+  - terraform.tfstate
+  - terraform.tfvars
+  - variables.tf

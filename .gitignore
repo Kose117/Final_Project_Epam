@@ -1,0 +1,115 @@
+﻿# ==============================================================================
+# Terraform & AWS Infrastructure Gitignore
+# ==============================================================================
+# Este archivo evita que se suban archivos sensibles o generados automaticamente.
+# Todo lo que sea tfstate, planes o cache debe quedar fuera del repo.
+# Los .tfvars y .env estan comentados por ahora para que sigas accediendo a ellos.
+# ==============================================================================
+
+
+# ------------------------------------------------------------------------------
+# Terraform state y metadata
+# ------------------------------------------------------------------------------
+*.tfstate
+*.tfstate.*
+*.tflock
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+terraform.rc
+.terraformrc
+
+# ------------------------------------------------------------------------------
+# Directorios locales de Terraform
+# ------------------------------------------------------------------------------
+.terraform/
+.terraform.lock.hcl
+.terraform.tfstate
+.terraform.tfstate.*
+
+# ------------------------------------------------------------------------------
+# Archivos de plan (nunca subirlos)
+# ------------------------------------------------------------------------------
+*.tfplan
+plan.out
+
+# ------------------------------------------------------------------------------
+# Archivos de salida / logs
+# ------------------------------------------------------------------------------
+*.log
+*.bak
+*.tmp
+*.swp
+
+# ------------------------------------------------------------------------------
+# Claves, credenciales, certificados
+# ------------------------------------------------------------------------------
+*.pem
+*.key
+*.crt
+*.csr
+*.pfx
+*.pub
+*.id_rsa
+*.id_dsa
+*.id_ecdsa
+*.id_ed25519
+secrets.tfvars.json
+
+# ------------------------------------------------------------------------------
+# Archivos de configuracion sensibles
+# ------------------------------------------------------------------------------
+# Ignorar archivos con secretos/variables de entorno
+*.tfvars
+*.tfvars.json
+*.auto.tfvars
+*.env
+.env*
+environments/*.tfvars
+environments/*.auto.tfvars
+infra/environments/*.tfvars
+infra/environments/*.auto.tfvars
+
+# Evitar incluir contraseñas de Ansible Vault si se usan localmente
+.vault_pass
+**/.vault_pass
+
+# ------------------------------------------------------------------------------
+# Archivos temporales o de sistema
+# ------------------------------------------------------------------------------
+.DS_Store
+Thumbs.db
+ehthumbs.db
+desktop.ini
+*.log
+*.tmp
+*.bak
+*.swp
+*.swo
+.idea/
+.vscode/
+*.code-workspace
+
+# ------------------------------------------------------------------------------
+# Archivos de salida de herramientas auxiliares
+# ------------------------------------------------------------------------------
+*.zip
+*.tar
+*.tar.gz
+*.7z
+
+# ------------------------------------------------------------------------------
+# Documentacion generada
+# ------------------------------------------------------------------------------
+/docs/generated/
+*.pdf
+*.docx
+*.pptx
+
+# ------------------------------------------------------------------------------
+# Carpeta de planes compilados si la usas
+# ------------------------------------------------------------------------------
+/infra/plans/
