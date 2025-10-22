@@ -9,32 +9,6 @@
 #   terraform apply -var-file=../environments/qa.tfvars
 # ==============================================================================
 
-terraform {
-  required_version = ">= 1.9.0"
-  required_providers {
-    aws   = { source = "hashicorp/aws", version = "~> 5.0" }
-    tls   = { source = "hashicorp/tls", version = "~> 4.0" }
-    local = { source = "hashicorp/local", version = "~> 2.4" }
-    http  = { source = "hashicorp/http", version = "~> 3.4" }
-  }
-  backend "s3" {} # Configurado via backend.hcl
-}
-
-provider "aws" {
-  region = var.region
-
-  # Tags aplicados automaticamente a TODOS los recursos
-  default_tags {
-    tags = {
-      Project     = var.project_name
-      Environment = var.environment
-      ManagedBy   = "terraform"
-      Team        = var.team
-      CostCenter  = var.cost_center
-    }
-  }
-}
-
 # ------------------------------------------------------------------------------
 # LOCALS - Variables derivadas
 # ------------------------------------------------------------------------------

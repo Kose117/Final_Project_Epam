@@ -1,6 +1,6 @@
 ﻿# Iniciar el state-bucket-init
 Ubicate en la carpeta del modulo
-cd /mnt/c/Users/Jose/Documents/Final_Project_Epam/infra/state-bucket-init
+cd /mnt/c/Users/Jose/Documents/Final_Project_Epam/infra/app/state-bucket-init
 
 terraform init
 terraform fmt -recursive
@@ -112,7 +112,6 @@ Recomendación: restaura las protecciones (`prevent_destroy=true`, `force_destro
 ## Historial de comandos validados (QA)
 
 # Generar par de llaves y escribir PEM en WSL
-cd infra/root
 terraform init -backend-config=../backend-config/backend.hcl
 terraform apply -var-file=../environments/qa.tfvars
 terraform apply -var-file=../environments/qa.tfvars -target=module.ssh_key -auto-approve
